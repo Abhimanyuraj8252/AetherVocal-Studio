@@ -1,6 +1,5 @@
 import React from 'react';
-import { History, Play, Download, Trash2, Music, Clock, Sparkles } from 'lucide-react';
-import { downloadAudioBlob } from '../utils/audioBufferEncoder';
+import { History, Play, Trash2, Music } from 'lucide-react';
 
 export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem }) {
   if (!history || history.length === 0) return null;
@@ -12,7 +11,7 @@ export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem }
           <History className="card-icon text-indigo-400" />
           <div>
             <h3 className="card-title">Recent Generated Audio History</h3>
-            <p className="card-description">Replay and redownload your recent speech audio files</p>
+            <p className="card-description">Replay your recent speech exports (click Play to re-speak)</p>
           </div>
         </div>
 
@@ -39,7 +38,9 @@ export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem }
                   <span className="history-voice">{item.voiceName}</span>
                   <span className="history-dot">•</span>
                   <span className="history-time">{item.timestamp}</span>
-                  <span className="history-format-badge">{item.format.toUpperCase()}</span>
+                  {item.format && (
+                    <span className="history-format-badge">{item.format.toUpperCase()}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -49,18 +50,9 @@ export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem }
                 type="button"
                 onClick={() => onPlayHistoryItem(item)}
                 className="btn-icon-sm"
-                title="Play Audio"
+                title="Re-speak this text"
               >
                 <Play className="w-3 h-3 text-cyan-400 fill-current" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => downloadAudioBlob(item.blob, item.filename)}
-                className="btn-icon-sm"
-                title="Download Audio File"
-              >
-                <Download className="w-3 h-3 text-emerald-400" />
               </button>
             </div>
           </div>

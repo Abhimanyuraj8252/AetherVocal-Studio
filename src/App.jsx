@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from './components/Header';
 import { HeroBanner } from './components/HeroBanner';
 import { FeatureCards } from './components/FeatureCards';
@@ -9,10 +9,8 @@ import { AudioVisualizer } from './components/AudioVisualizer';
 import { FooterPlayer } from './components/FooterPlayer';
 import { AudioHistory } from './components/AudioHistory';
 import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice } from './utils/voiceProfiles';
-import { convertAndExportAudio, downloadAudioBlob } from './utils/audioBufferEncoder';
-import { WebSpeechAudioStreamCapturer } from './utils/WebSpeechAudioStreamCapturer';
 import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
-import { NativeSpeechAudioExporter } from './utils/NativeSpeechAudioExporter';
+import { SpeechCaptureEngine } from './utils/SpeechCaptureEngine';
 
 export default function App() {
   const [theme, setTheme] = useState('dark');
@@ -23,7 +21,7 @@ export default function App() {
   const [targetGender, setTargetGender] = useState('all');
   const [rate, setRate] = useState(1.0);
   const [pitch, setPitch] = useState(1.15);
-  const [selectedFormat, setSelectedFormat] = useState('mp3');
+  const [selectedFormat, setSelectedFormat] = useState('webm');
 
   // Speech State
   const [systemVoices, setSystemVoices] = useState([]);
@@ -32,7 +30,11 @@ export default function App() {
   const [isPlayingSample, setIsPlayingSample] = useState(false);
   const [chunks, setChunks] = useState([]);
   const [activeChunkIndex, setActiveChunkIndex] = useState(-1);
-  
+
+  // Download/Generate State
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
+
   // LocalStorage Audio History Log
   const [audioHistory, setAudioHistory] = useState(() => {
     try {
@@ -43,8 +45,8 @@ export default function App() {
     }
   });
 
-  const capturerRef = useRef(new WebSpeechAudioStreamCapturer());
   const synthRef = useRef(window.speechSynthesis);
+  const currentUtteranceRef = useRef(null);
 
   // Sync theme attribute to document root
   useEffect(() => {
@@ -93,79 +95,104 @@ export default function App() {
   };
 
   // Synchronous Speech & AudioContext Resumer
-  const prepareSpeechExecution = () => {
+  const prepareSpeechExecution = useCallback(() => {
     MobileSafeAudioExporter.resumeAudioContext();
     if (window.speechSynthesis) {
       try {
         window.speechSynthesis.resume();
-        window.speechSynthesis.cancel();
       } catch (e) {}
     }
-  };
+  }, []);
 
-  // Play full speech on click
-  const handlePlayFullSpeech = () => {
+  // ─── PLAY FULL SPEECH ───
+  const handlePlayFullSpeech = useCallback(() => {
     if (!text.trim()) return;
+
+    // If paused, just resume
+    if (isPaused && window.speechSynthesis) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
+      return;
+    }
+
     prepareSpeechExecution();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
 
     setIsSpeaking(true);
     setIsPaused(false);
     setActiveChunkIndex(0);
 
-    // Play via WebSpeech API & WebAudio Fallback
     if (window.speechSynthesis) {
       try {
-        const utterance = new SpeechSynthesisUtterance(text);
-        const matchVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-        if (matchVoice) utterance.voice = matchVoice;
-        utterance.rate = rate;
-        utterance.pitch = pitch;
-
-        utterance.onend = () => {
-          setIsSpeaking(false);
-          setActiveChunkIndex(-1);
-        };
-        utterance.onerror = () => {
-          // If browser speech encounters error, play WebAudio fallback
-          NativeSpeechAudioExporter.playWebAudioSpeech(text, selectedProfile, pitch, rate, () => {
+        // Speak chunk by chunk for proper progress tracking
+        const speakChunks = (index) => {
+          if (index >= chunks.length) {
             setIsSpeaking(false);
             setActiveChunkIndex(-1);
-          });
+            return;
+          }
+
+          setActiveChunkIndex(index);
+          const utterance = new SpeechSynthesisUtterance(chunks[index]);
+          const matchVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
+          if (matchVoice) utterance.voice = matchVoice;
+          utterance.rate = rate;
+          utterance.pitch = pitch;
+
+          currentUtteranceRef.current = utterance;
+
+          utterance.onend = () => {
+            speakChunks(index + 1);
+          };
+          utterance.onerror = (event) => {
+            // Skip errored chunks, continue with next
+            if (event.error !== 'canceled') {
+              speakChunks(index + 1);
+            }
+          };
+
+          window.speechSynthesis.speak(utterance);
         };
 
-        window.speechSynthesis.speak(utterance);
+        speakChunks(0);
       } catch (e) {
-        NativeSpeechAudioExporter.playWebAudioSpeech(text, selectedProfile, pitch, rate, () => {
-          setIsSpeaking(false);
-          setActiveChunkIndex(-1);
-        });
-      }
-    } else {
-      NativeSpeechAudioExporter.playWebAudioSpeech(text, selectedProfile, pitch, rate, () => {
+        console.warn('Speech playback error:', e);
         setIsSpeaking(false);
         setActiveChunkIndex(-1);
-      });
+      }
     }
-  };
+  }, [text, chunks, isPaused, systemVoices, selectedProfile, rate, pitch, prepareSpeechExecution]);
 
-  const handlePause = () => {
+  // ─── PAUSE ───
+  const handlePause = useCallback(() => {
     if (window.speechSynthesis && isSpeaking) {
       window.speechSynthesis.pause();
       setIsPaused(true);
     }
-  };
+  }, [isSpeaking]);
 
-  const handleStop = () => {
-    prepareSpeechExecution();
+  // ─── STOP ───
+  const handleStop = useCallback(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    currentUtteranceRef.current = null;
     setIsSpeaking(false);
     setIsPaused(false);
     setActiveChunkIndex(-1);
-  };
+  }, []);
 
-  const handlePlaySingleChunk = (chunkText, index) => {
+  // ─── PLAY SINGLE CHUNK ───
+  const handlePlaySingleChunk = useCallback((chunkText, index) => {
     prepareSpeechExecution();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setActiveChunkIndex(index);
     setIsSpeaking(true);
+    setIsPaused(false);
 
     if (window.speechSynthesis) {
       try {
@@ -180,29 +207,24 @@ export default function App() {
           setActiveChunkIndex(-1);
         };
         utterance.onerror = () => {
-          NativeSpeechAudioExporter.playWebAudioSpeech(chunkText, selectedProfile, pitch, rate, () => {
-            setIsSpeaking(false);
-            setActiveChunkIndex(-1);
-          });
+          setIsSpeaking(false);
+          setActiveChunkIndex(-1);
         };
 
         window.speechSynthesis.speak(utterance);
       } catch (e) {
-        NativeSpeechAudioExporter.playWebAudioSpeech(chunkText, selectedProfile, pitch, rate, () => {
-          setIsSpeaking(false);
-          setActiveChunkIndex(-1);
-        });
-      }
-    } else {
-      NativeSpeechAudioExporter.playWebAudioSpeech(chunkText, selectedProfile, pitch, rate, () => {
         setIsSpeaking(false);
         setActiveChunkIndex(-1);
-      });
+      }
     }
-  };
+  }, [systemVoices, selectedProfile, rate, pitch, prepareSpeechExecution]);
 
-  const handlePlaySample = (profile) => {
+  // ─── PLAY VOICE SAMPLE ───
+  const handlePlaySample = useCallback((profile) => {
     prepareSpeechExecution();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setIsPlayingSample(true);
 
     const sample = profile.sampleText || 'AetherVocal Studio Speech Synthesis';
@@ -212,93 +234,121 @@ export default function App() {
         const utterance = new SpeechSynthesisUtterance(sample);
         const matchVoice = findMatchingSystemVoice(systemVoices, profile);
         if (matchVoice) utterance.voice = matchVoice;
-
         utterance.rate = rate;
         utterance.pitch = profile.defaultPitch || pitch;
 
         utterance.onend = () => setIsPlayingSample(false);
-        utterance.onerror = () => {
-          NativeSpeechAudioExporter.playWebAudioSpeech(sample, profile, profile.defaultPitch || pitch, rate, () => {
-            setIsPlayingSample(false);
-          });
-        };
+        utterance.onerror = () => setIsPlayingSample(false);
 
         window.speechSynthesis.speak(utterance);
       } catch (e) {
-        NativeSpeechAudioExporter.playWebAudioSpeech(sample, profile, profile.defaultPitch || pitch, rate, () => {
-          setIsPlayingSample(false);
-        });
-      }
-    } else {
-      NativeSpeechAudioExporter.playWebAudioSpeech(sample, profile, profile.defaultPitch || pitch, rate, () => {
         setIsPlayingSample(false);
-      });
+      }
     }
-  };
+  }, [systemVoices, rate, pitch, prepareSpeechExecution]);
 
-  const handleStopSample = () => {
-    prepareSpeechExecution();
+  const handleStopSample = useCallback(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setIsPlayingSample(false);
-  };
+  }, []);
 
-  // Instant Audio File Download on Click ("Generate & Save Audio")
-  const handleDownload = () => {
+  // ─── DOWNLOAD: REAL SPEECH AUDIO CAPTURE ───
+  const handleDownload = useCallback(async () => {
+    if (!text.trim() || isGenerating) return;
+
+    // Stop any current playback first
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+    setIsPaused(false);
+    setActiveChunkIndex(-1);
+
     prepareSpeechExecution();
+    setIsGenerating(true);
+    setDownloadError('');
 
-    const charCount = text.length || 1;
-    const estSeconds = Math.max(4, Math.ceil(charCount / (12 * rate)));
-
-    // Generate genuine spoken script WAV blob instantly
-    const wavBlob = NativeSpeechAudioExporter.generateSpokenScriptWav(
-      text,
-      selectedProfile,
-      pitch,
-      rate,
-      estSeconds
-    );
-
-    const filename = `AetherVocal_${selectedProfile.id || 'Speech'}.${selectedFormat}`;
-
-    // Save to LocalStorage Audio History
-    const historyItem = {
-      id: Date.now().toString(),
-      title: text.slice(0, 32) + '...',
-      voiceName: selectedProfile.name,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      format: selectedFormat,
-      filename,
-      blob: wavBlob
-    };
-
-    const updatedHistory = [historyItem, ...audioHistory].slice(0, 10);
-    setAudioHistory(updatedHistory);
     try {
-      localStorage.setItem('aethervocal_audio_history', JSON.stringify(updatedHistory.map(h => ({
-        ...h,
-        blob: null
-      }))));
-    } catch (e) {}
+      // Check if tab audio capture is supported
+      if (!SpeechCaptureEngine.isSupported()) {
+        throw new Error('CAPTURE_FAILED');
+      }
 
-    // Trigger instant mobile & desktop anchor download
-    MobileSafeAudioExporter.download(wavBlob, filename);
-  };
+      const matchVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
 
-  const handleClearHistory = () => {
+      // Capture REAL speech audio from the browser tab
+      const result = await SpeechCaptureEngine.captureSpokenAudio(
+        text,
+        matchVoice,
+        pitch,
+        rate
+      );
+
+      if (!result.blob || result.blob.size < 500) {
+        throw new Error('EMPTY_RECORDING');
+      }
+
+      const filename = `AetherVocal_${selectedProfile.id || 'Speech'}.${result.extension}`;
+
+      // Trigger download
+      MobileSafeAudioExporter.download(result.blob, filename);
+
+      // Save to audio history (text snippet, not blob — survives page reload)
+      const historyItem = {
+        id: Date.now().toString(),
+        title: text.slice(0, 40) + (text.length > 40 ? '...' : ''),
+        voiceName: selectedProfile.name,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        format: result.extension,
+        filename,
+        textSnippet: text.slice(0, 200)
+      };
+
+      const updatedHistory = [historyItem, ...audioHistory].slice(0, 10);
+      setAudioHistory(updatedHistory);
+      try {
+        localStorage.setItem('aethervocal_audio_history', JSON.stringify(updatedHistory));
+      } catch (e) {}
+
+    } catch (err) {
+      console.warn('Audio download error:', err);
+      setDownloadError(SpeechCaptureEngine.getErrorMessage(err));
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [text, isGenerating, systemVoices, selectedProfile, pitch, rate, audioHistory, prepareSpeechExecution]);
+
+  // ─── HISTORY ACTIONS ───
+  const handleClearHistory = useCallback(() => {
     setAudioHistory([]);
     try {
       localStorage.removeItem('aethervocal_audio_history');
     } catch (e) {}
-  };
+  }, []);
 
-  const handlePlayHistoryItem = (item) => {
-    if (item.blob) {
-      const url = URL.createObjectURL(item.blob);
-      const audio = new Audio(url);
-      audio.play();
-    } else {
-      handlePlayFullSpeech();
+  const handlePlayHistoryItem = useCallback((item) => {
+    // Re-speak the saved text snippet from history
+    if (item.textSnippet && window.speechSynthesis) {
+      prepareSpeechExecution();
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      const utterance = new SpeechSynthesisUtterance(item.textSnippet);
+      const profile = PREMIUM_VOICE_PROFILES.find(p => p.name === item.voiceName) || selectedProfile;
+      const matchVoice = findMatchingSystemVoice(systemVoices, profile);
+      if (matchVoice) utterance.voice = matchVoice;
+      utterance.rate = rate;
+      utterance.pitch = pitch;
+      window.speechSynthesis.speak(utterance);
     }
-  };
+  }, [systemVoices, selectedProfile, rate, pitch, prepareSpeechExecution]);
+
+  // ─── DISMISS DOWNLOAD ERROR ───
+  const handleDismissError = useCallback(() => {
+    setDownloadError('');
+  }, []);
 
   // Stats calculation
   const charCount = text.length;
@@ -362,7 +412,7 @@ export default function App() {
               onStopSample={handleStopSample}
             />
 
-            <AudioVisualizer isSpeaking={isSpeaking || isPlayingSample} />
+            <AudioVisualizer isSpeaking={isSpeaking || isPlayingSample || isGenerating} />
           </div>
         </div>
       </main>
@@ -370,10 +420,13 @@ export default function App() {
       <FooterPlayer
         isSpeaking={isSpeaking}
         isPaused={isPaused}
+        isGenerating={isGenerating}
+        downloadError={downloadError}
         onPlay={handlePlayFullSpeech}
         onPause={handlePause}
         onStop={handleStop}
         onDownload={handleDownload}
+        onDismissError={handleDismissError}
         selectedFormat={selectedFormat}
         setSelectedFormat={setSelectedFormat}
         stats={{ charCount, wordCount, formattedDuration }}
