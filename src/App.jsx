@@ -136,9 +136,18 @@ export default function App() {
     const cleanSample = strictSpeechClean(profile.sampleText);
     const utterance = new SpeechSynthesisUtterance(cleanSample);
     if (matchedVoice) utterance.voice = matchedVoice;
+    utterance.lang = matchedVoice?.lang || (profile.langGroup === 'hi' ? 'hi-IN' : 'en-US');
     
     utterance.rate = profile.defaultRate || rate;
     utterance.pitch = profile.defaultPitch || (profile.gender === 'Male' ? 0.85 : 1.15);
+
+    console.log('[AetherVocal] sample voice selected', {
+      profile: profile.name,
+      voice: matchedVoice?.name || 'browser-default',
+      lang: utterance.lang,
+      rate: utterance.rate,
+      pitch: utterance.pitch
+    });
 
     utterance.onend = () => setIsPlayingSample(false);
     utterance.onerror = () => setIsPlayingSample(false);
@@ -156,8 +165,18 @@ export default function App() {
     const cleanChunk = strictSpeechClean(chunkTextString);
     const utterance = new SpeechSynthesisUtterance(cleanChunk);
     if (matchedVoice) utterance.voice = matchedVoice;
+    utterance.lang = matchedVoice?.lang || (selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US');
     utterance.rate = rate;
     utterance.pitch = pitch;
+
+    console.log('[AetherVocal] single chunk voice selected', {
+      profile: selectedProfile.name,
+      voice: matchedVoice?.name || 'browser-default',
+      lang: utterance.lang,
+      rate: utterance.rate,
+      pitch: utterance.pitch,
+      chunkPreview: cleanChunk.slice(0, 80)
+    });
 
     utterance.onstart = () => {
       setIsPlaying(true);
@@ -195,8 +214,18 @@ export default function App() {
     const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
     
     if (matchedVoice) utterance.voice = matchedVoice;
+    utterance.lang = matchedVoice?.lang || (selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US');
     utterance.rate = rate;
     utterance.pitch = pitch;
+
+    console.log('[AetherVocal] queue chunk voice selected', {
+      profile: selectedProfile.name,
+      chunkIndex: index,
+      voice: matchedVoice?.name || 'browser-default',
+      lang: utterance.lang,
+      rate: utterance.rate,
+      pitch: utterance.pitch
+    });
 
     utterance.onend = () => {
       if (isPlayingRef.current) {
@@ -311,16 +340,22 @@ export default function App() {
 
       await recordAndSynthesize();
 
-      // Stop tab audio capture & retrieve genuine speech audio blob
+      // Stop tab audio capture & retrieve genuine speech audio blob if the browser provided one.
+      // On Linux/Chrome this can be empty even when sharing is allowed, so we fall back below.
       const liveRecordedBlob = await tabRecorder.stopCapture();
 
       if (!liveRecordedBlob || liveRecordedBlob.size === 0) {
-        throw new Error('No valid audio was captured. Check tab/system audio permissions and try again.');
+        console.warn('[AetherVocal] tab capture was empty; using generated fallback audio');
       }
 
       const result = await convertAndExportAudio({
         chunksBlob: liveRecordedBlob,
+        text,
+        pitch,
+        rate,
+        estimatedSeconds: stats.estimatedSeconds,
         format: outputFormat
+        ,profile: selectedProfile
       });
 
       if (result && result.blob) {
