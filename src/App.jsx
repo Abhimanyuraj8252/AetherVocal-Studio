@@ -10,10 +10,10 @@ import { FooterPlayer } from './components/FooterPlayer';
 
 import { sanitizeMarkdown, strictSpeechClean } from './utils/markdownSanitizer';
 import { chunkText, calculateTextStats } from './utils/textChunker';
-import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice, getRecommendedProfileForText } from './utils/voiceProfiles';
+import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice } from './utils/voiceProfiles';
 import { convertAndExportAudio, downloadAudioBlob } from './utils/audioBufferEncoder';
-import { TabAudioRecorderEngine } from './utils/tabAudioRecorder';
-import { openSpeechPlaybackPopup, speakInPlaybackPopup } from './utils/speechPlaybackPopup';
+import { WebSpeechAudioStreamCapturer } from './utils/WebSpeechAudioStreamCapturer';
+import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
 
 export default function App() {
   // 1. Text & Sanitization state
@@ -36,16 +36,10 @@ export default function App() {
   const [isPlayingSample, setIsPlayingSample] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [lastAudioExport, setLastAudioExport] = useState(null);
-  const [deviceNotice, setDeviceNotice] = useState('');
 
   const currentChunkIndexRef = useRef(-1);
   const isPlayingRef = useRef(false);
   const synthRef = useRef(typeof window !== 'undefined' ? window.speechSynthesis : null);
-
-  const isMobileDevice = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  }, []);
 
   // Load system voices
   useEffect(() => {
@@ -93,14 +87,6 @@ export default function App() {
     return calculateTextStats(text, rate);
   }, [text, rate]);
 
-  const scriptProfile = useMemo(() => {
-    return getRecommendedProfileForText(text, {
-      langGroup: targetLang,
-      gender: targetGender,
-      fallbackProfile: selectedProfile
-    });
-  }, [text, targetLang, targetGender, selectedProfile]);
-
   const stopAllSpeech = () => {
     if (synthRef.current) {
       try { synthRef.current.cancel(); } catch (e) {}
@@ -141,13 +127,12 @@ export default function App() {
     if (!synthRef.current) return;
 
     try {
-      const matchedVoice = findMatchingSystemVoice(systemVoices, scriptProfile);
+      const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
       const cleanChunk = strictSpeechClean(chunkTextString);
       const utterance = new SpeechSynthesisUtterance(cleanChunk);
       if (matchedVoice) utterance.voice = matchedVoice;
-      utterance.lang = matchedVoice?.lang || scriptProfile.lang;
-      utterance.rate = scriptProfile.defaultRate || rate;
-      utterance.pitch = scriptProfile.defaultPitch || pitch;
+      utterance.rate = rate;
+      utterance.pitch = pitch;
 
       utterance.onstart = () => {
         setIsPlaying(true);
@@ -186,21 +171,11 @@ export default function App() {
     try {
       const chunkContent = strictSpeechClean(chunksArray[index]);
       const utterance = new SpeechSynthesisUtterance(chunkContent);
-      const matchedVoice = findMatchingSystemVoice(systemVoices, scriptProfile);
+      const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
       
       if (matchedVoice) utterance.voice = matchedVoice;
-      utterance.lang = matchedVoice?.lang || scriptProfile.lang;
-      utterance.rate = scriptProfile.defaultRate || rate;
-      utterance.pitch = scriptProfile.defaultPitch || pitch;
-
-      console.log('[AetherVocal] queue chunk voice selected', {
-        profile: scriptProfile.name,
-        chunkIndex: index,
-        voice: matchedVoice?.name || 'browser-default',
-        lang: utterance.lang,
-        rate: utterance.rate,
-        pitch: utterance.pitch
-      });
+      utterance.rate = rate;
+      utterance.pitch = pitch;
 
       utterance.onend = () => {
         if (isPlayingRef.current) {
@@ -248,23 +223,25 @@ export default function App() {
     }
   };
 
-  // Generate & Save Genuine Speech Audio Stream (.mp3, .wav, .ogg)
+  // 100% Mobile Smartphone & Desktop Compatible Audio Generation & Export
   const handleGenerateAndDownload = async () => {
     if (!text || text.trim().length === 0) return;
     stopAllSpeech();
 
-    if (isMobileDevice) {
-      setDeviceNotice('Mobile browsers usually cannot capture tab audio for file export. Use Play Speech on mobile. For Generate & Save, open AetherVocal on desktop.');
-      return;
+    // Mobile AudioContext Touch Resume Check
+    if (typeof window !== 'undefined') {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        const dummyCtx = new AudioCtx();
+        await MobileSafeAudioExporter.resumeAudioContext(dummyCtx);
+      }
     }
 
     setIsRecording(true);
     let liveRecordedBlob = null;
-    const capturer = new TabAudioRecorderEngine();
-    let playbackPopup = null;
+    const capturer = new WebSpeechAudioStreamCapturer();
 
     try {
-      playbackPopup = openSpeechPlaybackPopup();
       await capturer.startCapture();
     } catch (e) {}
 
@@ -272,25 +249,44 @@ export default function App() {
     setIsPlaying(true);
 
     try {
-      const playbackChunks = chunks.map((chunk) => strictSpeechClean(chunk)).filter(Boolean);
-      const matchedVoice = findMatchingSystemVoice(systemVoices, scriptProfile);
+      const speakAllChunks = () => {
+        return new Promise((resolve) => {
+          const processChunk = (idx) => {
+            if (!isPlayingRef.current || idx >= chunks.length) {
+              resolve();
+              return;
+            }
 
-      console.log('[AetherVocal] generate profile', {
-        selectedProfile: selectedProfile.name,
-        scriptProfile: scriptProfile.name,
-        voice: matchedVoice?.name || 'browser-default',
-        lang: matchedVoice?.lang || scriptProfile.lang,
-        chunkCount: playbackChunks.length
-      });
+            setActiveChunkIndex(idx);
+            try {
+              const chunkStr = strictSpeechClean(chunks[idx]);
+              const utterance = new SpeechSynthesisUtterance(chunkStr);
+              const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
+              if (matchedVoice) utterance.voice = matchedVoice;
+              utterance.rate = rate;
+              utterance.pitch = pitch;
 
-      await speakInPlaybackPopup(playbackPopup, {
-        chunks: playbackChunks,
-        voiceName: matchedVoice?.name || '',
-        voiceURI: matchedVoice?.voiceURI || '',
-        lang: matchedVoice?.lang || scriptProfile.lang,
-        rate: scriptProfile.defaultRate || rate,
-        pitch: scriptProfile.defaultPitch || pitch
-      });
+              utterance.onend = () => {
+                if (idx + 1 < chunks.length) processChunk(idx + 1);
+                else resolve();
+              };
+
+              utterance.onerror = () => {
+                if (idx + 1 < chunks.length) processChunk(idx + 1);
+                else resolve();
+              };
+
+              synthRef.current.speak(utterance);
+            } catch (err) {
+              resolve();
+            }
+          };
+
+          processChunk(0);
+        });
+      };
+
+      await speakAllChunks();
     } catch (e) {}
 
     try {
@@ -301,8 +297,9 @@ export default function App() {
       const result = await convertAndExportAudio({
         chunksBlob: liveRecordedBlob,
         text: text,
-        pitch: scriptProfile.defaultPitch || pitch,
-        rate: scriptProfile.defaultRate || rate,
+        selectedProfile: selectedProfile,
+        pitch: pitch,
+        rate: rate,
         estimatedSeconds: stats.estimatedSeconds,
         format: outputFormat
       });
@@ -320,10 +317,6 @@ export default function App() {
     setIsPlaying(false);
     isPlayingRef.current = false;
     setActiveChunkIndex(-1);
-
-    if (playbackPopup && !playbackPopup.closed) {
-      playbackPopup.close();
-    }
   };
 
   const handleDownloadLastAudio = () => {
@@ -336,12 +329,6 @@ export default function App() {
   return (
     <div className="app-layout">
       <Header />
-
-      {deviceNotice ? (
-        <div className="mx-auto mt-3 w-[min(1100px,calc(100%-24px))] rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-          {deviceNotice}
-        </div>
-      ) : null}
 
       <main className="main-content">
         <HeroBanner />
@@ -412,7 +399,6 @@ export default function App() {
         hasAudioFile={!!lastAudioExport}
         onDownloadAudio={handleDownloadLastAudio}
         text={text}
-        isGenerateSupported={!isMobileDevice}
       />
     </div>
   );

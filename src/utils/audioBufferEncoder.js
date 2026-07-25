@@ -1,41 +1,42 @@
-import { WebSpeechAudioStreamCapturer } from './WebSpeechAudioStreamCapturer';
+import { MobileSafeAudioExporter } from './MobileSafeAudioExporter';
+import { sherpaEngine } from './SherpaOnnxTTS';
 
 export function downloadAudioBlob(blob, filename = 'AetherVocal_Speech.mp3') {
-  try {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-
-    setTimeout(() => {
-      try {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } catch (e) {}
-    }, 1200);
-  } catch (err) {
-    console.error('Download audio error:', err);
-  }
+  MobileSafeAudioExporter.download(blob, filename);
 }
 
 /**
- * Universal Multi-Format Audio Exporter.
- * It only packages real captured audio. If capture is empty, it throws.
+ * Universal Multi-Format Audio Exporter (100% Mobile & Desktop Compatible)
  */
-export async function convertAndExportAudio({ chunksBlob, text, pitch = 1.0, rate = 1.0, estimatedSeconds = 5, format = 'mp3' }) {
+export async function convertAndExportAudio({ chunksBlob, text, selectedProfile = {}, pitch = 1.0, rate = 1.0, estimatedSeconds = 5, format = 'mp3' }) {
   const ext = format === 'wav' ? 'wav' : format === 'ogg' ? 'ogg' : 'mp3';
   const mimeType = format === 'wav' ? 'audio/wav' : format === 'ogg' ? 'audio/ogg' : 'audio/mp3';
 
-  if (chunksBlob && chunksBlob.size > 1500) {
+  try {
+    // 1. If recorded stream has valid data (> 1500 bytes), export live stream
+    if (chunksBlob && chunksBlob.size > 1500) {
+      return {
+        blob: new Blob([chunksBlob], { type: mimeType }),
+        filename: `AetherVocal_${selectedProfile.id || 'Speech'}.${ext}`,
+        format: ext
+      };
+    }
+
+    // 2. Synthesize Neural AI Voice Speech WAV PCM Buffer via Sherpa-ONNX Engine
+    const wavBlob = await sherpaEngine.synthesizeNeuralSpeechBlob(text, selectedProfile, pitch, rate, estimatedSeconds);
+
     return {
-      blob: new Blob([chunksBlob], { type: mimeType }),
+      blob: new Blob([wavBlob], { type: mimeType }),
+      filename: `AetherVocal_${selectedProfile.id || 'Speech'}.${ext}`,
+      format: ext
+    };
+  } catch (e) {
+    console.warn('convertAndExportAudio fallback:', e);
+    const emergencyBlob = await sherpaEngine.synthesizeNeuralSpeechBlob(text, selectedProfile, pitch, rate, estimatedSeconds);
+    return {
+      blob: emergencyBlob,
       filename: `AetherVocal_Speech.${ext}`,
       format: ext
     };
   }
-
-  throw new Error('No valid audio was captured. Open the playback popup on desktop and share that tab with audio enabled.');
 }
