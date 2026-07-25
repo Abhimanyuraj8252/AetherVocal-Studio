@@ -8,6 +8,7 @@ import { VoiceSelector } from './components/VoiceSelector';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { FooterPlayer } from './components/FooterPlayer';
 import { AudioHistory } from './components/AudioHistory';
+import { SeoSection } from './components/SeoSection';
 import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice } from './utils/voiceProfiles';
 import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
 import { CloudSpeechSynthesizer } from './utils/CloudSpeechSynthesizer';
@@ -408,6 +409,8 @@ export default function App() {
             <AudioVisualizer isSpeaking={isSpeaking || isPlayingSample || isGenerating} />
           </div>
         </div>
+
+        <SeoSection />
       </main>
 
       <FooterPlayer

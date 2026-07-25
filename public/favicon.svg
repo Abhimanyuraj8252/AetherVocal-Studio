@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="50%" stop-color="#111827" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    
+    <linearGradient id="primaryGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="50%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#d946ef" />
+    </linearGradient>
+
+    <linearGradient id="accentGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+
+    <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Outer Rounded Square Frame -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bgGrad)" stroke="url(#primaryGlow)" stroke-width="8" />
+  
+  <!-- Subtle Glowing Inner Ring -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="url(#primaryGlow)" stroke-width="3" opacity="0.4" />
+
+  <!-- Dynamic Soundwave Waves Forming "A" Silhouette -->
+  <g filter="url(#glowEffect)">
+    <!-- Central Sound Bar 1 -->
+    <rect x="156" y="210" width="18" height="92" rx="9" fill="url(#accentGlow)" />
+    <!-- Sound Bar 2 -->
+    <rect x="194" y="150" width="18" height="212" rx="9" fill="url(#primaryGlow)" />
+    <!-- Center Peak Bar (Apex of A) -->
+    <rect x="247" y="100" width="18" height="312" rx="9" fill="url(#primaryGlow)" />
+    <!-- Sound Bar 4 -->
+    <rect x="300" y="150" width="18" height="212" rx="9" fill="url(#primaryGlow)" />
+    <!-- Sound Bar 5 -->
+    <rect x="338" y="210" width="18" height="92" rx="9" fill="url(#accentGlow)" />
+
+    <!-- Aether Cross Bar Connector Wave -->
+    <path d="M 165 260 Q 256 220 347 260" fill="none" stroke="url(#accentGlow)" stroke-width="12" stroke-linecap="round" />
+  </g>
+
+  <!-- Glowing Pulse Dots -->
+  <circle cx="256" cy="74" r="10" fill="#38bdf8" />
+  <circle cx="120" cy="256" r="7" fill="#818cf8" />
+  <circle cx="392" cy="256" r="7" fill="#d946ef" />
+</svg>
