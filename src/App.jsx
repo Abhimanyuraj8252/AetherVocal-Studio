@@ -10,7 +10,7 @@ import { FooterPlayer } from './components/FooterPlayer';
 import { AudioHistory } from './components/AudioHistory';
 import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice } from './utils/voiceProfiles';
 import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
-import { FormantSpeechSynthesizer } from './utils/FormantSpeechSynthesizer';
+import { CloudSpeechSynthesizer } from './utils/CloudSpeechSynthesizer';
 
 export default function App() {
   const [theme, setTheme] = useState('dark');
@@ -271,8 +271,8 @@ export default function App() {
     setDownloadError('');
 
     try {
-      // Synthesize character-based formant speech WAV blob
-      const wavBlob = FormantSpeechSynthesizer.synthesize(text, {
+      // Synthesize high-quality natural cloud speech MP3 blob
+      const wavBlob = await CloudSpeechSynthesizer.synthesize(text, {
         gender: selectedProfile?.gender || 'Female',
         pitch,
         rate
@@ -282,7 +282,7 @@ export default function App() {
         throw new Error('Audio generation failed. Text is empty or invalid.');
       }
 
-      const ext = selectedFormat === 'wav' ? 'wav' : 'wav'; // Formant synth outputs WAV PCM
+      const ext = 'mp3'; // Cloud synth outputs MP3
       const filename = `AetherVocal_${selectedProfile?.id || 'Speech'}.${ext}`;
 
       // Trigger download using mobile-safe exporter
@@ -294,7 +294,7 @@ export default function App() {
         title: text.slice(0, 40) + (text.length > 40 ? '...' : ''),
         voiceName: selectedProfile?.name || 'Standard Voice',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        format: 'WAV',
+        format: 'MP3',
         filename,
         textSnippet: text.slice(0, 200)
       };
