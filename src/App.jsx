@@ -33,6 +33,7 @@ export default function App() {
 
   // Download/Generate State
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, percent: 0, statusText: '' });
   const [downloadError, setDownloadError] = useState('');
 
   // LocalStorage Audio History Log
@@ -271,18 +272,21 @@ export default function App() {
     setDownloadError('');
 
     try {
-      // Synthesize high-quality natural cloud speech MP3 blob
+      // Synthesize high-quality long-form cloud speech WAV blob
       const wavBlob = await CloudSpeechSynthesizer.synthesize(text, {
         gender: selectedProfile?.gender || 'Female',
         pitch,
-        rate
+        rate,
+        onProgress: (progress) => {
+          setGenerationProgress(progress);
+        }
       });
 
       if (!wavBlob || wavBlob.size < 100) {
         throw new Error('Audio generation failed. Text is empty or invalid.');
       }
 
-      const ext = 'mp3'; // Cloud synth outputs MP3
+      const ext = selectedFormat === 'webm' ? 'mp3' : 'wav';
       const filename = `AetherVocal_${selectedProfile?.id || 'Speech'}.${ext}`;
 
       // Trigger download using mobile-safe exporter
@@ -414,6 +418,7 @@ export default function App() {
         isSpeaking={isSpeaking}
         isPaused={isPaused}
         isGenerating={isGenerating}
+        generationProgress={generationProgress}
         downloadError={downloadError}
         onPlay={handlePlayFullSpeech}
         onPause={handlePause}

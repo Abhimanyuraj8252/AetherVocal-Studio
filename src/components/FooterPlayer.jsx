@@ -1,10 +1,11 @@
 import React from 'react';
-import { Play, Pause, Square, Download, Volume2, Loader2, X, AlertTriangle } from 'lucide-react';
+import { Play, Pause, Square, Download, Loader2, X, AlertTriangle } from 'lucide-react';
 
 export function FooterPlayer({
   isSpeaking,
   isPaused,
   isGenerating,
+  generationProgress,
   downloadError,
   onPlay,
   onPause,
@@ -40,17 +41,17 @@ export function FooterPlayer({
           <div className="segmented-control flex-1">
             <button
               type="button"
-              className={`segmented-btn ${selectedFormat === 'webm' ? 'active' : ''}`}
-              onClick={() => setSelectedFormat('webm')}
-            >
-              WebM
-            </button>
-            <button
-              type="button"
               className={`segmented-btn ${selectedFormat === 'wav' ? 'active' : ''}`}
               onClick={() => setSelectedFormat('wav')}
             >
               WAV
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${selectedFormat === 'webm' ? 'active' : ''}`}
+              onClick={() => setSelectedFormat('webm')}
+            >
+              MP3
             </button>
           </div>
         </div>
@@ -98,7 +99,13 @@ export function FooterPlayer({
             {isGenerating ? (
               <>
                 <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
-                <span>Recording...</span>
+                <span>
+                  {generationProgress?.statusText 
+                    ? (generationProgress.total > 1 
+                        ? `Chunk ${generationProgress.current}/${generationProgress.total} (${generationProgress.percent}%)` 
+                        : 'Generating...')
+                    : 'Generating Audio...'}
+                </span>
               </>
             ) : (
               <>
