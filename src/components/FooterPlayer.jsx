@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, Download, Volume2, Sparkles, ShieldCheck } from 'lucide-react';
+import { Play, Pause, Square, Download, Volume2 } from 'lucide-react';
 
 export function FooterPlayer({
   isSpeaking,
@@ -17,28 +17,28 @@ export function FooterPlayer({
       <div className="player-bar-container">
         {/* Format Selector */}
         <div className="player-format-picker">
-          <span className="format-label">Audio Format:</span>
-          <div className="segmented-control">
+          <span className="format-label">Format:</span>
+          <div className="segmented-control flex-1">
             <button
               type="button"
               className={`segmented-btn ${selectedFormat === 'mp3' ? 'active' : ''}`}
               onClick={() => setSelectedFormat('mp3')}
             >
-              MP3 (320kbps)
+              MP3
             </button>
             <button
               type="button"
               className={`segmented-btn ${selectedFormat === 'wav' ? 'active' : ''}`}
               onClick={() => setSelectedFormat('wav')}
             >
-              WAV (Lossless)
+              WAV
             </button>
             <button
               type="button"
               className={`segmented-btn ${selectedFormat === 'ogg' ? 'active' : ''}`}
               onClick={() => setSelectedFormat('ogg')}
             >
-              OGG (Vorbis)
+              OGG
             </button>
           </div>
         </div>
@@ -51,8 +51,8 @@ export function FooterPlayer({
               onClick={onPlay}
               className="btn-player btn-play"
             >
-              <Play className="w-4 h-4 fill-current" />
-              <span>{isPaused ? 'Resume Speech' : 'Play Full Speech'}</span>
+              <Play className="w-4 h-4 fill-current flex-shrink-0" />
+              <span>{isPaused ? 'Resume' : 'Play Speech'}</span>
             </button>
           ) : (
             <button
@@ -60,8 +60,8 @@ export function FooterPlayer({
               onClick={onPause}
               className="btn-player btn-pause"
             >
-              <Pause className="w-4 h-4 fill-current" />
-              <span>Pause Speech</span>
+              <Pause className="w-4 h-4 fill-current flex-shrink-0" />
+              <span>Pause</span>
             </button>
           )}
 
@@ -71,7 +71,7 @@ export function FooterPlayer({
               onClick={onStop}
               className="btn-player btn-stop"
             >
-              <Square className="w-4 h-4 fill-current" />
+              <Square className="w-4 h-4 fill-current flex-shrink-0" />
               <span>Stop</span>
             </button>
           )}
@@ -81,8 +81,8 @@ export function FooterPlayer({
             onClick={onDownload}
             className="btn-player btn-download-gradient"
           >
-            <Download className="w-4 h-4" />
-            <span>Generate & Save Audio (.{selectedFormat.toUpperCase()})</span>
+            <Download className="w-4 h-4 flex-shrink-0" />
+            <span>Save (.{selectedFormat.toUpperCase()})</span>
           </button>
         </div>
       </div>
