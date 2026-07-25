@@ -149,11 +149,16 @@ export function downloadAudioBlob(blob, filename = 'aethervocal_speech.webm') {
 }
 
 /**
- * Export only real captured audio. If the browser did not capture a valid audio
- * stream, fail fast instead of fabricating noise.
+ * Export captured audio when available.
+ * If capture is empty, fail clearly instead of fabricating tone audio.
  */
-export async function convertAndExportAudio({ chunksBlob, format = 'webm' }) {
+export async function convertAndExportAudio({ chunksBlob, text = '', pitch = 1.0, rate = 1.0, estimatedSeconds = 5, format = 'webm', profile = null }) {
   const sourceBlob = await coerceToAudioBlob(chunksBlob, { preferredFormat: format });
+
+  if (!sourceBlob || sourceBlob.size === 0) {
+    throw new Error('No audio was captured. Use the AetherVocal Playback tab for export, then share that tab with audio enabled.');
+  }
+
   const actualMimeType = normalizeMimeType(sourceBlob.type || FORMAT_TO_MIME[format] || 'audio/webm');
   const resolvedFormat = getAudioExtensionFromMimeType(actualMimeType);
   const desiredMimeType = FORMAT_TO_MIME[format] || actualMimeType;

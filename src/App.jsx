@@ -14,6 +14,7 @@ import { chunkText, calculateTextStats } from './utils/textChunker';
 import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice } from './utils/voiceProfiles';
 import { convertAndExportAudio, downloadAudioBlob } from './utils/audioBufferEncoder';
 import { TabAudioRecorderEngine } from './utils/tabAudioRecorder';
+import { openSpeechPlaybackPopup, speakInPlaybackPopup } from './utils/speechPlaybackPopup';
 
 export default function App() {
   // 1. Text & Sanitization state
@@ -277,75 +278,47 @@ export default function App() {
     clearGeneratedAudio();
 
     const tabRecorder = new TabAudioRecorderEngine();
+    let playbackPopup = null;
 
     try {
       setGeneratedAudioError('');
       setGeneratedAudioWarning('');
       setIsRecording(true);
 
+      playbackPopup = openSpeechPlaybackPopup();
+
       await tabRecorder.startCapture();
 
       isPlayingRef.current = true;
       setIsPlaying(true);
 
-      // Synthesize all text script chunks while recorder captures live spoken audio
-      const recordAndSynthesize = () => {
-        return new Promise((resolve) => {
-          const speakChunk = (idx) => {
-            if (!isPlayingRef.current || idx >= chunks.length) {
-              resolve();
-              return;
-            }
+      const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
+      const playbackChunks = chunks.map((chunk) => strictSpeechClean(chunk)).filter(Boolean);
+      console.log('[AetherVocal] playback capture job', {
+        chunkCount: playbackChunks.length,
+        voice: matchedVoice?.name || 'browser-default',
+        lang: matchedVoice?.lang || (selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US'),
+        rate,
+        pitch
+      });
 
-            setActiveChunkIndex(idx);
-            const chunkStr = strictSpeechClean(chunks[idx]);
-            const utterance = new SpeechSynthesisUtterance(chunkStr);
-            const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-            if (matchedVoice) utterance.voice = matchedVoice;
-            utterance.lang = selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US';
-            utterance.rate = rate;
-            utterance.pitch = pitch;
+      const playbackPromise = speakInPlaybackPopup(playbackPopup, {
+        chunks: playbackChunks,
+        voiceName: matchedVoice?.name || '',
+        voiceURI: matchedVoice?.voiceURI || '',
+        lang: matchedVoice?.lang || (selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US'),
+        rate,
+        pitch
+      });
 
-            console.log('[AetherVocal] speaking chunk', {
-              chunkIndex: idx,
-              voice: matchedVoice?.name || 'browser-default',
-              lang: utterance.lang,
-              rate: utterance.rate,
-              pitch: utterance.pitch
-            });
-
-            utterance.onend = () => {
-              if (idx + 1 < chunks.length) {
-                speakChunk(idx + 1);
-              } else {
-                resolve();
-              }
-            };
-
-            utterance.onerror = (event) => {
-              console.error('[AetherVocal] speech synthesis chunk error', event);
-              if (idx + 1 < chunks.length) {
-                speakChunk(idx + 1);
-              } else {
-                resolve();
-              }
-            };
-
-            synthRef.current.speak(utterance);
-          };
-
-          speakChunk(0);
-        });
-      };
-
-      await recordAndSynthesize();
+      await playbackPromise;
 
       // Stop tab audio capture & retrieve genuine speech audio blob if the browser provided one.
       // On Linux/Chrome this can be empty even when sharing is allowed, so we fall back below.
       const liveRecordedBlob = await tabRecorder.stopCapture();
 
       if (!liveRecordedBlob || liveRecordedBlob.size === 0) {
-        console.warn('[AetherVocal] tab capture was empty; using generated fallback audio');
+        throw new Error('No audio was captured. Make sure the AetherVocal Playback tab was selected in the share dialog with tab audio enabled.');
       }
 
       const result = await convertAndExportAudio({
@@ -384,6 +357,9 @@ export default function App() {
       console.error('[AetherVocal] audio generation failed', error);
       setGeneratedAudioError(error?.message || 'Audio generation failed.');
     } finally {
+      if (playbackPopup && !playbackPopup.closed) {
+        playbackPopup.close();
+      }
       setIsRecording(false);
       setIsPlaying(false);
       isPlayingRef.current = false;
