@@ -63,6 +63,7 @@ export function openSpeechPlaybackPopup() {
         </div>
         <script>
           const statusNode = document.getElementById('status');
+          window.__AETHERVOCAL_READY__ = false;
 
           function setStatus(message) {
             statusNode.textContent = message;
@@ -114,6 +115,9 @@ export function openSpeechPlaybackPopup() {
               utterance.rate = payload.rate || 1;
               utterance.pitch = payload.pitch || 1;
 
+              window.speechSynthesis.cancel();
+              window.speechSynthesis.resume();
+
               setStatus('Speaking chunk ' + (index + 1) + ' of ' + chunks.length + '...');
 
               await new Promise((resolve, reject) => {
@@ -146,6 +150,7 @@ export function openSpeechPlaybackPopup() {
           });
 
           if (window.opener) {
+            window.__AETHERVOCAL_READY__ = true;
             window.opener.postMessage({ type: 'AETHERVOCAL_POPUP_READY' }, window.location.origin);
           }
         </script>
@@ -165,14 +170,34 @@ export function speakInPlaybackPopup(popup, payload) {
       reject(new Error('Timed out waiting for playback popup.'));
     }, 30000);
 
+    let sent = false;
+    let readyIntervalId = null;
+    const sendPayload = () => {
+      if (!popup || popup.closed) {
+        cleanup();
+        reject(new Error('Playback popup was closed before speech started.'));
+        return;
+      }
+
+      if (sent) return;
+      sent = true;
+      popup.postMessage({ type: 'AETHERVOCAL_SPEAK', payload }, window.location.origin);
+    };
+
     const cleanup = () => {
       clearTimeout(timeoutId);
       window.removeEventListener('message', handleMessage);
+      if (readyIntervalId) clearInterval(readyIntervalId);
     };
 
     const handleMessage = (event) => {
       if (event.origin !== window.location.origin) return;
       if (!event.data) return;
+
+      if (event.data.type === 'AETHERVOCAL_POPUP_READY') {
+        sendPayload();
+        return;
+      }
 
       if (event.data.type === 'AETHERVOCAL_DONE') {
         cleanup();
@@ -186,6 +211,15 @@ export function speakInPlaybackPopup(popup, payload) {
     };
 
     window.addEventListener('message', handleMessage);
-    popup.postMessage({ type: 'AETHERVOCAL_SPEAK', payload }, window.location.origin);
+
+    readyIntervalId = setInterval(() => {
+      try {
+        if (popup && !popup.closed && popup.__AETHERVOCAL_READY__) {
+          sendPayload();
+        }
+      } catch (error) {
+        // Ignore cross-window access jitter while the popup finishes loading.
+      }
+    }, 100);
   });
 }

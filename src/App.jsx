@@ -42,6 +42,11 @@ export default function App() {
   const [generatedAudioWarning, setGeneratedAudioWarning] = useState('');
   const [generatedAudioMimeType, setGeneratedAudioMimeType] = useState('');
 
+  const isMobileDevice = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  }, []);
+
   // Refs for tracking playback loop
   const currentChunkIndexRef = useRef(-1);
   const isPlayingRef = useRef(false);
@@ -276,6 +281,11 @@ export default function App() {
     if (!chunks || chunks.length === 0) return;
     stopAllSpeech();
     clearGeneratedAudio();
+
+    if (isMobileDevice) {
+      setGeneratedAudioError('Mobile browsers usually cannot capture tab audio for file export. Use Play Speech on mobile, or open AetherVocal on desktop for Generate & Save.');
+      return;
+    }
 
     const tabRecorder = new TabAudioRecorderEngine();
     let playbackPopup = null;
