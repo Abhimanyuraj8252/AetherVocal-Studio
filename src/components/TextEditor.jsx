@@ -1,20 +1,32 @@
 import React, { useState } from 'react';
-import { 
-  FileText, 
-  Wand2, 
-  Trash2, 
-  Copy, 
-  Check, 
-  AlertCircle, 
-  Sparkles, 
-  Layers, 
-  Clock, 
-  Type,
-  Eye,
-  Code
-} from 'lucide-react';
-import { SAMPLE_TEXTS } from '../utils/voiceHelper';
-import { detectMarkdownSymbols, sanitizeMarkdown } from '../utils/markdownSanitizer';
+import { FileText, Sparkles, Check, Copy, Trash2, Zap, BookOpen, Briefcase, Video } from 'lucide-react';
+
+const SAMPLE_SCRIPTS = [
+  {
+    id: 'tech_review',
+    label: '📱 Tech Review (Hinglish)',
+    icon: Zap,
+    text: 'What is up everyone! Aaj hum is super cool smartphone ka full depth review karne wale hain. Battery life aur camera output bohot amazing hain!'
+  },
+  {
+    id: 'story_narration',
+    label: '📖 Story Narration (Hindi)',
+    icon: BookOpen,
+    text: 'एक समय की बात है, जब विंध्याचल की पहाड़ियों में एक प्राचीन राजा राज करता था। वहाँ का वातावरण बड़ा ही मनमोहक और शांत था।'
+  },
+  {
+    id: 'corporate_presentation',
+    label: '💼 Corporate (English)',
+    icon: Briefcase,
+    text: 'Welcome everyone to our Q3 product launch. Today, we are excited to unveil our next generation AI Voice Studio platform.'
+  },
+  {
+    id: 'casual_vlog',
+    label: '🎧 Casual Vlog (Hindi)',
+    icon: Video,
+    text: 'हे दोस्तों! आज का दिन बहुत ही खूबसूरत है। चलिए आज हम एक नई जगह एक्सप्लोर करते हैं और कुछ मजेदार बातें करते हैं।'
+  }
+];
 
 export function TextEditor({
   text,
@@ -25,75 +37,32 @@ export function TextEditor({
   chunkCount,
   onSanitize
 }) {
+  const [activeTab, setActiveTab] = useState('editor'); // 'editor' | 'preview'
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState('editor'); // 'editor' or 'preview'
-  const hasMarkdown = detectMarkdownSymbols(text);
 
   const handleCopy = () => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 1500);
   };
 
   const handleClear = () => {
     setText('');
   };
 
-  const loadPreset = (category, key) => {
-    const sample = SAMPLE_TEXTS[category][key];
-    if (sample) {
-      setText(sample);
-    }
-  };
-
-  // Convert raw text into styled HTML elements for Markdown preview
-  const renderStyledMarkdown = (rawText) => {
-    if (!rawText) return <p className="text-slate-400 italic">No text to preview...</p>;
-
-    const lines = rawText.split('\n');
-    return lines.map((line, idx) => {
-      if (line.startsWith('# ')) {
-        return <h1 key={idx} className="md-h1">{line.replace('# ', '')}</h1>;
-      }
-      if (line.startsWith('## ')) {
-        return <h2 key={idx} className="md-h2">{line.replace('## ', '')}</h2>;
-      }
-      if (line.startsWith('### ')) {
-        return <h3 key={idx} className="md-h3">{line.replace('### ', '')}</h3>;
-      }
-      if (line.startsWith('> ')) {
-        return <blockquote key={idx} className="md-blockquote">{line.replace('> ', '')}</blockquote>;
-      }
-      if (line.startsWith('- ') || line.startsWith('* ')) {
-        return <li key={idx} className="md-li">{line.replace(/^[* -]+/, '')}</li>;
-      }
-      if (!line.trim()) {
-        return <div key={idx} className="h-2"></div>;
-      }
-      
-      const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      return (
-        <p 
-          key={idx} 
-          className="md-p" 
-          dangerouslySetInnerHTML={{ __html: formattedLine }} 
-        />
-      );
-    });
-  };
-
   return (
     <div className="card text-editor-card">
       <div className="card-header">
         <div className="card-title-group">
-          <FileText className="card-icon text-indigo-400" />
+          <FileText className="card-icon text-cyan-400" />
           <div>
-            <h2 className="card-title">Text & Markdown Studio</h2>
-            <p className="card-description">Paste or type your script in Hindi or English (Unlimited length)</p>
+            <h3 className="card-title">Text Script & Auto Markdown Stripper</h3>
+            <p className="card-description">Paste script in Hindi or English (Markdown # & * auto-removed)</p>
           </div>
         </div>
 
-        {/* Action Controls & Mode Switcher */}
+        {/* Header Action Buttons */}
         <div className="card-header-actions">
           <div className="segmented-control">
             <button
@@ -101,159 +70,106 @@ export function TextEditor({
               className={`segmented-btn ${activeTab === 'editor' ? 'active' : ''}`}
               onClick={() => setActiveTab('editor')}
             >
-              <Code className="w-3.5 h-3.5 inline mr-1" /> Editor
+              Editor
             </button>
             <button
               type="button"
               className={`segmented-btn ${activeTab === 'preview' ? 'active' : ''}`}
               onClick={() => setActiveTab('preview')}
             >
-              <Eye className="w-3.5 h-3.5 inline mr-1" /> Preview
+              Clean Preview
             </button>
           </div>
 
           <div className="header-icon-buttons">
-            <button 
-              type="button" 
-              onClick={handleCopy} 
-              className="btn-icon" 
-              title="Copy text"
-              disabled={!text}
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="btn-icon-sm"
+              title="Copy Script"
             >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-cyan-400" />}
             </button>
-            <button 
-              type="button" 
-              onClick={handleClear} 
-              className="btn-icon text-rose-400 hover:bg-rose-500/10" 
-              title="Clear text"
-              disabled={!text}
+            <button
+              type="button"
+              onClick={handleClear}
+              className="btn-icon-sm text-rose-400 hover:bg-rose-500/20"
+              title="Clear Text"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Preset Buttons */}
+      {/* Curated Script Samples Bar */}
       <div className="presets-bar">
-        <span className="presets-label">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400 inline mr-1" />
-          Sample Scripts:
-        </span>
+        <span className="presets-label">Quick Sample Scripts:</span>
         <div className="preset-chips-scroll">
-          <button 
-            type="button"
-            className="preset-chip" 
-            onClick={() => loadPreset('hi', 'story')}
-          >
-            🇮🇳 हिंदी कहानी
-          </button>
-          <button 
-            type="button"
-            className="preset-chip" 
-            onClick={() => loadPreset('hi', 'tech')}
-          >
-            🇮🇳 हिंदी टेक
-          </button>
-          <button 
-            type="button"
-            className="preset-chip" 
-            onClick={() => loadPreset('en', 'story')}
-          >
-            🇬🇧 English Story
-          </button>
-          <button 
-            type="button"
-            className="preset-chip" 
-            onClick={() => loadPreset('en', 'tech')}
-          >
-            🇬🇧 English Tech
-          </button>
+          {SAMPLE_SCRIPTS.map(sample => (
+            <button
+              key={sample.id}
+              type="button"
+              className="preset-chip"
+              onClick={() => setText(sample.text)}
+            >
+              <span>{sample.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Markdown Cleaner Banner */}
-      {hasMarkdown && (
-        <div className="markdown-alert">
-          <div className="markdown-alert-info">
-            <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
-            <div>
-              <p className="markdown-alert-title">Markdown Formatting Detected (#, *, _)</p>
-              <p className="markdown-alert-text">
-                Clean symbols automatically to ensure natural audio reading without pronouncing hashes or asterisks!
-              </p>
-            </div>
-          </div>
-          <button 
-            type="button"
-            onClick={onSanitize}
-            className="btn-sm btn-primary-gradient"
-          >
-            <Wand2 className="w-3.5 h-3.5 mr-1" /> Clean Markdown Now
-          </button>
-        </div>
-      )}
-
-      {/* Editor vs Markdown Preview View */}
+      {/* Editor / Preview Body */}
       {activeTab === 'editor' ? (
-        <div className="textarea-container">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="yahan apna Hindi ya English text type ya paste karein... (# ya * wale markdown text ko automatic clean kar diya jayega)..."
-            className="main-textarea"
-            rows={10}
-          />
-        </div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="यहाँ अपना हिन्दी या English टेक्स्ट टाइप करें या पेस्ट करें..."
+          className="main-textarea"
+          rows={7}
+        />
       ) : (
-        <div className="markdown-styled-preview">
-          <div className="preview-header">
-            <span>✨ Styled Markdown View</span>
-            <span className="text-xs text-slate-400">Formatted UI view of your input text</span>
-          </div>
-          <div className="markdown-body">
-            {renderStyledMarkdown(text)}
-          </div>
+        <div className="main-textarea overflow-y-auto bg-slate-900/60 p-3 rounded-xl min-h-[160px] text-sm text-slate-200">
+          {text ? text : <span className="text-slate-500 italic">No clean preview text available. Type something in editor...</span>}
         </div>
       )}
 
-      {/* Footer Metrics - Fixed Stat Pills Row */}
+      {/* Editor Footer & Stat Pills Row */}
       <div className="editor-footer">
-        <div className="auto-clean-toggle">
-          <label className="switch-label">
-            <input 
+        <div className="stats-pills-row">
+          <span className="stat-pill-badge">
+            Characters: <strong className="text-cyan-400 ml-1">{stats.charCount}</strong>
+          </span>
+          <span className="stat-pill-badge">
+            Words: <strong className="text-pink-400 ml-1">{stats.wordCount}</strong>
+          </span>
+          <span className="stat-pill-badge">
+            Speech Duration: <strong className="text-amber-400 ml-1">~{stats.formattedDuration}</strong>
+          </span>
+          <span className="stat-pill-badge highlight-pill">
+            Speech Chunks: <strong className="text-emerald-400 ml-1">{chunkCount} Chunks</strong>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
+            <input
               type="checkbox"
               checked={autoSanitize}
               onChange={(e) => setAutoSanitize(e.target.checked)}
-              className="switch-input"
+              className="rounded accent-indigo-500 w-3.5 h-3.5"
             />
-            <span className="switch-slider"></span>
-            <span className="switch-text">Auto-clean `#` & `*` Markdown on paste</span>
+            Auto Clean Markdown
           </label>
-        </div>
 
-        {/* Stat Pills horizontal flex container */}
-        <div className="stats-pills-row">
-          <div className="stat-pill-badge" title="Character count">
-            <Type className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-            <span>{stats.charCount.toLocaleString()} Chars</span>
-          </div>
-
-          <div className="stat-pill-badge" title="Word count">
-            <FileText className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-            <span>{stats.wordCount.toLocaleString()} Words</span>
-          </div>
-
-          <div className="stat-pill-badge" title="Audio Chunks">
-            <Layers className="w-3.5 h-3.5 text-pink-400 flex-shrink-0" />
-            <span>{chunkCount} Speech Chunks</span>
-          </div>
-
-          <div className="stat-pill-badge highlight-pill" title="Estimated Audio Duration">
-            <Clock className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-            <span>Est. ~{stats.formattedTime}</span>
-          </div>
+          <button
+            type="button"
+            onClick={onSanitize}
+            className="btn-sm btn-outline-emerald text-xs"
+          >
+            <Sparkles className="w-3 h-3 inline mr-1 text-emerald-400" />
+            Clean Symbols
+          </button>
         </div>
       </div>
     </div>

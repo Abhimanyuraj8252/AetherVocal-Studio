@@ -1,146 +1,91 @@
 import React from 'react';
-import { 
-  Play, 
-  Pause, 
-  Square, 
-  Download, 
-  Wand2, 
-  Sparkles, 
-  RefreshCw, 
-  FileAudio,
-  Check
-} from 'lucide-react';
+import { Play, Pause, Square, Download, Volume2, Sparkles, ShieldCheck } from 'lucide-react';
 
 export function FooterPlayer({
-  isPlaying,
+  isSpeaking,
   isPaused,
-  isRecording,
   onPlay,
   onPause,
-  onResume,
   onStop,
-  onGenerateAndDownload,
-  outputFormat,
-  setOutputFormat,
-  hasAudioFile,
-  onDownloadAudio,
-  text
+  onDownload,
+  selectedFormat,
+  setSelectedFormat,
+  stats
 }) {
-  const isTextEmpty = !text || !text.trim();
-
   return (
-    <div className="sticky-player-bar">
+    <footer className="sticky-player-bar">
       <div className="player-bar-container">
-        
-        {/* Left: Format Picker */}
+        {/* Format Selector */}
         <div className="player-format-picker">
-          <label className="format-label">
-            <FileAudio className="w-4 h-4 text-cyan-400 inline mr-1" /> Export Format:
-          </label>
-          <div className="segmented-control format-control">
+          <span className="format-label">Audio Format:</span>
+          <div className="segmented-control">
             <button
               type="button"
-              className={`segmented-btn ${outputFormat === 'mp3' ? 'active' : ''}`}
-              onClick={() => setOutputFormat('mp3')}
+              className={`segmented-btn ${selectedFormat === 'mp3' ? 'active' : ''}`}
+              onClick={() => setSelectedFormat('mp3')}
             >
-              🎵 MP3
+              MP3 (320kbps)
             </button>
             <button
               type="button"
-              className={`segmented-btn ${outputFormat === 'wav' ? 'active' : ''}`}
-              onClick={() => setOutputFormat('wav')}
+              className={`segmented-btn ${selectedFormat === 'wav' ? 'active' : ''}`}
+              onClick={() => setSelectedFormat('wav')}
             >
-              🎼 WAV
+              WAV (Lossless)
             </button>
             <button
               type="button"
-              className={`segmented-btn ${outputFormat === 'ogg' ? 'active' : ''}`}
-              onClick={() => setOutputFormat('ogg')}
+              className={`segmented-btn ${selectedFormat === 'ogg' ? 'active' : ''}`}
+              onClick={() => setSelectedFormat('ogg')}
             >
-              🔊 OGG
+              OGG (Vorbis)
             </button>
           </div>
         </div>
 
-        {/* Middle: Playback Actions */}
+        {/* Player Controls */}
         <div className="player-primary-actions">
-          {isPlaying ? (
-            <>
-              {isPaused ? (
-                <button
-                  type="button"
-                  onClick={onResume}
-                  className="btn-player btn-play-active"
-                >
-                  <Play className="w-5 h-5 fill-current" />
-                  <span>Resume</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onPause}
-                  className="btn-player btn-pause"
-                >
-                  <Pause className="w-5 h-5 fill-current" />
-                  <span>Pause</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={onStop}
-                className="btn-player btn-stop"
-              >
-                <Square className="w-5 h-5 fill-current" />
-                <span>Stop</span>
-              </button>
-            </>
-          ) : (
+          {!isSpeaking || isPaused ? (
             <button
               type="button"
               onClick={onPlay}
-              disabled={isTextEmpty}
               className="btn-player btn-play"
             >
-              <Play className="w-5 h-5 fill-current" />
-              <span>Play Speech</span>
+              <Play className="w-4 h-4 fill-current" />
+              <span>{isPaused ? 'Resume Speech' : 'Play Full Speech'}</span>
             </button>
-          )}
-
-          {/* Primary High-Value Action: Generate & Export Audio */}
-          <button
-            type="button"
-            onClick={onGenerateAndDownload}
-            disabled={isTextEmpty || isRecording}
-            className="btn-player btn-download-gradient"
-          >
-            {isRecording ? (
-              <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                <span>Generating {outputFormat.toUpperCase()} Audio...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-5 h-5" />
-                <span>Generate & Save Audio ({outputFormat.toUpperCase()})</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Right: Download Last File Button */}
-        <div className="player-status-info">
-          {hasAudioFile && !isRecording && (
+          ) : (
             <button
               type="button"
-              onClick={onDownloadAudio}
-              className="btn-sm btn-outline-emerald"
+              onClick={onPause}
+              className="btn-player btn-pause"
             >
-              <Download className="w-3.5 h-3.5 mr-1" /> Re-Download .{outputFormat} File
+              <Pause className="w-4 h-4 fill-current" />
+              <span>Pause Speech</span>
             </button>
           )}
+
+          {isSpeaking && (
+            <button
+              type="button"
+              onClick={onStop}
+              className="btn-player btn-stop"
+            >
+              <Square className="w-4 h-4 fill-current" />
+              <span>Stop</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onDownload}
+            className="btn-player btn-download-gradient"
+          >
+            <Download className="w-4 h-4" />
+            <span>Generate & Save Audio (.{selectedFormat.toUpperCase()})</span>
+          </button>
         </div>
       </div>
-    </div>
+    </footer>
   );
 }

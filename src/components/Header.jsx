@@ -1,20 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Volume2, Sparkles, WifiOff, Globe, Sun, Moon } from 'lucide-react';
 
-export default function Header() {
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('aethervocal_theme') || 'dark';
-  });
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('aethervocal_theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
-  };
-
+export function Header({ theme, toggleTheme }) {
   return (
     <header className="header-glass">
       <div className="header-container">

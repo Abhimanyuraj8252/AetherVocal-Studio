@@ -1,353 +1,299 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import Header from './components/Header';
+import React, { useState, useEffect, useRef } from 'react';
+import { Header } from './components/Header';
 import { HeroBanner } from './components/HeroBanner';
 import { FeatureCards } from './components/FeatureCards';
 import { TextEditor } from './components/TextEditor';
+import { ChunkQueue } from './components/ChunkQueue';
 import { VoiceSelector } from './components/VoiceSelector';
 import { AudioVisualizer } from './components/AudioVisualizer';
-import { ChunkQueue } from './components/ChunkQueue';
 import { FooterPlayer } from './components/FooterPlayer';
-
-import { sanitizeMarkdown, strictSpeechClean } from './utils/markdownSanitizer';
-import { chunkText, calculateTextStats } from './utils/textChunker';
+import { AudioHistory } from './components/AudioHistory';
 import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice } from './utils/voiceProfiles';
 import { convertAndExportAudio, downloadAudioBlob } from './utils/audioBufferEncoder';
 import { WebSpeechAudioStreamCapturer } from './utils/WebSpeechAudioStreamCapturer';
 import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
 
 export default function App() {
-  // 1. Text & Sanitization state
-  const [text, setText] = useState('');
+  const [theme, setTheme] = useState('dark');
+  const [text, setText] = useState('नमस्ते! एथरवोकल स्टूडियो में आपका स्वागत है। यहाँ आप हिंदी और इंग्लिश स्क्रिप्ट को हाई-क्वालिटी न्यूरल ऑडियो में बदल सकते हैं।');
   const [autoSanitize, setAutoSanitize] = useState(true);
-
-  // 2. Voice Profiles & System Voices
-  const [systemVoices, setSystemVoices] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(PREMIUM_VOICE_PROFILES[0]);
   const [targetLang, setTargetLang] = useState('all');
   const [targetGender, setTargetGender] = useState('all');
   const [rate, setRate] = useState(1.0);
-  const [pitch, setPitch] = useState(1.0);
-  const [outputFormat, setOutputFormat] = useState('mp3');
+  const [pitch, setPitch] = useState(1.15);
+  const [selectedFormat, setSelectedFormat] = useState('mp3');
 
-  // 3. Playback & Recording state
-  const [activeChunkIndex, setActiveChunkIndex] = useState(-1);
-  const [isPlaying, setIsPlaying] = useState(false);
+  // Speech State
+  const [systemVoices, setSystemVoices] = useState([]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isPlayingSample, setIsPlayingSample] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [lastAudioExport, setLastAudioExport] = useState(null);
+  const [chunks, setChunks] = useState([]);
+  const [activeChunkIndex, setActiveChunkIndex] = useState(-1);
+  
+  // LocalStorage Audio History Log
+  const [audioHistory, setAudioHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aethervocal_audio_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
-  const currentChunkIndexRef = useRef(-1);
-  const isPlayingRef = useRef(false);
-  const synthRef = useRef(typeof window !== 'undefined' ? window.speechSynthesis : null);
+  const capturerRef = useRef(new WebSpeechAudioStreamCapturer());
+  const synthRef = useRef(window.speechSynthesis);
+
+  // Sync theme attribute to document root
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   // Load system voices
   useEffect(() => {
     const updateVoices = () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        const availableVoices = window.speechSynthesis.getVoices();
-        setSystemVoices(availableVoices);
+      if (window.speechSynthesis) {
+        const available = window.speechSynthesis.getVoices();
+        setSystemVoices(available);
       }
     };
-
     updateVoices();
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
+    if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
       window.speechSynthesis.onvoiceschanged = updateVoices;
     }
   }, []);
 
-  // Update pitch/rate automatically on profile selection
+  // Split text into chunks
   useEffect(() => {
-    if (selectedProfile) {
-      setPitch(selectedProfile.defaultPitch || (selectedProfile.gender === 'Male' ? 0.85 : 1.15));
-      setRate(selectedProfile.defaultRate || 1.0);
-    }
-  }, [selectedProfile]);
-
-  const handleTextChange = (newText) => {
-    if (autoSanitize) {
-      const cleaned = sanitizeMarkdown(newText);
-      setText(cleaned);
-    } else {
-      setText(newText);
-    }
-  };
-
-  const handleManualSanitize = () => {
-    const cleaned = sanitizeMarkdown(text);
-    setText(cleaned);
-  };
-
-  const chunks = useMemo(() => {
-    const cleanSpeechText = strictSpeechClean(text);
-    return chunkText(cleanSpeechText, 180);
-  }, [text]);
-
-  const stats = useMemo(() => {
-    return calculateTextStats(text, rate);
-  }, [text, rate]);
-
-  const stopAllSpeech = () => {
-    if (synthRef.current) {
-      try { synthRef.current.cancel(); } catch (e) {}
-    }
-    isPlayingRef.current = false;
-    setIsPlaying(false);
-    setIsPaused(false);
-    setIsPlayingSample(false);
-    setActiveChunkIndex(-1);
-    currentChunkIndexRef.current = -1;
-  };
-
-  const handlePlaySample = (profile = selectedProfile) => {
-    stopAllSpeech();
-    if (!synthRef.current) return;
-
-    try {
-      const matchedVoice = findMatchingSystemVoice(systemVoices, profile);
-      const cleanSample = strictSpeechClean(profile.sampleText);
-      const utterance = new SpeechSynthesisUtterance(cleanSample);
-      if (matchedVoice) utterance.voice = matchedVoice;
-      
-      utterance.rate = profile.defaultRate || rate;
-      utterance.pitch = profile.defaultPitch || (profile.gender === 'Male' ? 0.85 : 1.15);
-
-      utterance.onend = () => setIsPlayingSample(false);
-      utterance.onerror = () => setIsPlayingSample(false);
-
-      setIsPlayingSample(true);
-      synthRef.current.speak(utterance);
-    } catch (e) {
-      setIsPlayingSample(false);
-    }
-  };
-
-  const handlePlaySingleChunk = (chunkTextString, idx) => {
-    stopAllSpeech();
-    if (!synthRef.current) return;
-
-    try {
-      const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-      const cleanChunk = strictSpeechClean(chunkTextString);
-      const utterance = new SpeechSynthesisUtterance(cleanChunk);
-      if (matchedVoice) utterance.voice = matchedVoice;
-      utterance.rate = rate;
-      utterance.pitch = pitch;
-
-      utterance.onstart = () => {
-        setIsPlaying(true);
-        setActiveChunkIndex(idx);
-      };
-
-      utterance.onend = () => {
-        setIsPlaying(false);
-        setActiveChunkIndex(-1);
-      };
-
-      utterance.onerror = () => {
-        setIsPlaying(false);
-        setActiveChunkIndex(-1);
-      };
-
-      synthRef.current.speak(utterance);
-    } catch (e) {
-      setIsPlaying(false);
-      setActiveChunkIndex(-1);
-    }
-  };
-
-  const playNextChunk = (chunksArray, index) => {
-    if (!isPlayingRef.current || index >= chunksArray.length) {
-      setIsPlaying(false);
-      isPlayingRef.current = false;
-      setActiveChunkIndex(-1);
-      currentChunkIndexRef.current = -1;
+    if (!text.trim()) {
+      setChunks([]);
       return;
     }
+    const rawChunks = text
+      .split(/(?<=[.?!।\n])\s+/)
+      .map(c => c.trim())
+      .filter(Boolean);
 
-    currentChunkIndexRef.current = index;
-    setActiveChunkIndex(index);
+    setChunks(rawChunks.length > 0 ? rawChunks : [text.trim()]);
+  }, [text]);
 
-    try {
-      const chunkContent = strictSpeechClean(chunksArray[index]);
-      const utterance = new SpeechSynthesisUtterance(chunkContent);
-      const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-      
-      if (matchedVoice) utterance.voice = matchedVoice;
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const handleSanitizeText = () => {
+    const clean = text
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/[#*~_`^|\\{}[\]@$%&=+<>/]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    setText(clean);
+  };
+
+  // Play full speech
+  const handlePlayFullSpeech = async () => {
+    if (!text.trim()) return;
+    if (synthRef.current) synthRef.current.cancel();
+
+    setIsSpeaking(true);
+    setIsPaused(false);
+    capturerRef.current.startRecording();
+
+    for (let i = 0; i < chunks.length; i++) {
+      setActiveChunkIndex(i);
+      await speakChunkPromise(chunks[i]);
+    }
+
+    setIsSpeaking(false);
+    setActiveChunkIndex(-1);
+  };
+
+  const speakChunkPromise = (chunkText) => {
+    return new Promise((resolve) => {
+      if (!synthRef.current) {
+        resolve();
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(chunkText);
+      const matchVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
+      if (matchVoice) utterance.voice = matchVoice;
+
       utterance.rate = rate;
       utterance.pitch = pitch;
 
-      utterance.onend = () => {
-        if (isPlayingRef.current) {
-          playNextChunk(chunksArray, index + 1);
-        }
-      };
-
-      utterance.onerror = () => {
-        if (isPlayingRef.current && index + 1 < chunksArray.length) {
-          playNextChunk(chunksArray, index + 1);
-        } else {
-          setIsPlaying(false);
-          isPlayingRef.current = false;
-        }
-      };
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
 
       synthRef.current.speak(utterance);
-    } catch (e) {
-      setIsPlaying(false);
-      isPlayingRef.current = false;
-    }
-  };
-
-  const handleStartPlay = () => {
-    if (!chunks || chunks.length === 0) return;
-    stopAllSpeech();
-
-    isPlayingRef.current = true;
-    setIsPlaying(true);
-    setIsPaused(false);
-    playNextChunk(chunks, 0);
+    });
   };
 
   const handlePause = () => {
-    if (synthRef.current && isPlaying) {
-      try { synthRef.current.pause(); } catch (e) {}
+    if (synthRef.current && isSpeaking) {
+      synthRef.current.pause();
       setIsPaused(true);
     }
   };
 
-  const handleResume = () => {
-    if (synthRef.current && isPaused) {
-      try { synthRef.current.resume(); } catch (e) {}
+  const handleStop = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
       setIsPaused(false);
+      setActiveChunkIndex(-1);
     }
   };
 
-  // 100% Mobile Smartphone & Desktop Compatible Audio Generation & Export
-  const handleGenerateAndDownload = async () => {
-    if (!text || text.trim().length === 0) return;
-    stopAllSpeech();
+  const handlePlaySingleChunk = (chunkText, index) => {
+    if (synthRef.current) synthRef.current.cancel();
+    setActiveChunkIndex(index);
+    setIsSpeaking(true);
 
-    // Mobile AudioContext Touch Resume Check
-    if (typeof window !== 'undefined') {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        const dummyCtx = new AudioCtx();
-        await MobileSafeAudioExporter.resumeAudioContext(dummyCtx);
-      }
-    }
+    const utterance = new SpeechSynthesisUtterance(chunkText);
+    const matchVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
+    if (matchVoice) utterance.voice = matchVoice;
+    utterance.rate = rate;
+    utterance.pitch = pitch;
 
-    setIsRecording(true);
-    let liveRecordedBlob = null;
-    const capturer = new WebSpeechAudioStreamCapturer();
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setActiveChunkIndex(-1);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setActiveChunkIndex(-1);
+    };
 
-    try {
-      await capturer.startCapture();
-    } catch (e) {}
-
-    isPlayingRef.current = true;
-    setIsPlaying(true);
-
-    try {
-      const speakAllChunks = () => {
-        return new Promise((resolve) => {
-          const processChunk = (idx) => {
-            if (!isPlayingRef.current || idx >= chunks.length) {
-              resolve();
-              return;
-            }
-
-            setActiveChunkIndex(idx);
-            try {
-              const chunkStr = strictSpeechClean(chunks[idx]);
-              const utterance = new SpeechSynthesisUtterance(chunkStr);
-              const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-              if (matchedVoice) utterance.voice = matchedVoice;
-              utterance.rate = rate;
-              utterance.pitch = pitch;
-
-              utterance.onend = () => {
-                if (idx + 1 < chunks.length) processChunk(idx + 1);
-                else resolve();
-              };
-
-              utterance.onerror = () => {
-                if (idx + 1 < chunks.length) processChunk(idx + 1);
-                else resolve();
-              };
-
-              synthRef.current.speak(utterance);
-            } catch (err) {
-              resolve();
-            }
-          };
-
-          processChunk(0);
-        });
-      };
-
-      await speakAllChunks();
-    } catch (e) {}
-
-    try {
-      liveRecordedBlob = await capturer.stopCapture();
-    } catch (e) {}
-
-    try {
-      const result = await convertAndExportAudio({
-        chunksBlob: liveRecordedBlob,
-        text: text,
-        selectedProfile: selectedProfile,
-        pitch: pitch,
-        rate: rate,
-        estimatedSeconds: stats.estimatedSeconds,
-        format: outputFormat
-      });
-
-      if (result && result.blob) {
-        setLastAudioExport(result);
-        const filename = `AetherVocal_${selectedProfile.id}_${Date.now()}.${result.format}`;
-        downloadAudioBlob(result.blob, filename);
-      }
-    } catch (err) {
-      console.warn('Export error handled gracefully:', err);
-    }
-
-    setIsRecording(false);
-    setIsPlaying(false);
-    isPlayingRef.current = false;
-    setActiveChunkIndex(-1);
+    synthRef.current.speak(utterance);
   };
 
-  const handleDownloadLastAudio = () => {
-    if (lastAudioExport && lastAudioExport.blob) {
-      const filename = `AetherVocal_Speech_Export.${lastAudioExport.format}`;
-      downloadAudioBlob(lastAudioExport.blob, filename);
+  const handlePlaySample = (profile) => {
+    if (synthRef.current) synthRef.current.cancel();
+    setIsPlayingSample(true);
+
+    const sample = profile.sampleText || 'AetherVocal Studio Speech Synthesis';
+    const utterance = new SpeechSynthesisUtterance(sample);
+    const matchVoice = findMatchingSystemVoice(systemVoices, profile);
+    if (matchVoice) utterance.voice = matchVoice;
+
+    utterance.rate = rate;
+    utterance.pitch = profile.defaultPitch || pitch;
+
+    utterance.onend = () => setIsPlayingSample(false);
+    utterance.onerror = () => setIsPlayingSample(false);
+
+    synthRef.current.speak(utterance);
+  };
+
+  const handleStopSample = () => {
+    if (synthRef.current) synthRef.current.cancel();
+    setIsPlayingSample(false);
+  };
+
+  // Generate & Save Audio File
+  const handleDownload = async () => {
+    MobileSafeAudioExporter.resumeAudioContext();
+    const recordedBlob = await capturerRef.current.stopRecording();
+    
+    const charCount = text.length || 1;
+    const estSeconds = Math.max(5, Math.ceil(charCount / 12));
+
+    const exportResult = await convertAndExportAudio({
+      chunksBlob: recordedBlob,
+      text,
+      selectedProfile,
+      pitch,
+      rate,
+      estimatedSeconds: estSeconds,
+      format: selectedFormat
+    });
+
+    // Save to LocalStorage Audio History
+    const historyItem = {
+      id: Date.now().toString(),
+      title: text.slice(0, 32) + '...',
+      voiceName: selectedProfile.name,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      format: selectedFormat,
+      filename: exportResult.filename,
+      blob: exportResult.blob
+    };
+
+    const updatedHistory = [historyItem, ...audioHistory].slice(0, 10);
+    setAudioHistory(updatedHistory);
+    try {
+      localStorage.setItem('aethervocal_audio_history', JSON.stringify(updatedHistory.map(h => ({
+        ...h,
+        blob: null // Do not serialize binary blob to avoid quota errors
+      }))));
+    } catch (e) {}
+
+    downloadAudioBlob(exportResult.blob, exportResult.filename);
+  };
+
+  const handleClearHistory = () => {
+    setAudioHistory([]);
+    try {
+      localStorage.removeItem('aethervocal_audio_history');
+    } catch (e) {}
+  };
+
+  const handlePlayHistoryItem = (item) => {
+    if (item.blob) {
+      const url = URL.createObjectURL(item.blob);
+      const audio = new Audio(url);
+      audio.play();
+    } else {
+      handlePlayFullSpeech();
     }
   };
+
+  // Stats calculation
+  const charCount = text.length;
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const totalSeconds = Math.ceil(charCount / (12 * rate));
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  const formattedDuration = `${mins}m ${secs}s`;
 
   return (
     <div className="app-layout">
-      <Header />
+      <Header theme={theme} toggleTheme={toggleTheme} />
 
       <main className="main-content">
         <HeroBanner />
         <FeatureCards />
 
-        <div className="grid-container mt-4">
-          <div className="column-left">
+        <div className="grid-container">
+          {/* Left Column: Text Editor & Speech Queue */}
+          <div className="flex flex-col gap-4">
             <TextEditor
               text={text}
-              setText={handleTextChange}
+              setText={setText}
               autoSanitize={autoSanitize}
               setAutoSanitize={setAutoSanitize}
-              stats={stats}
+              stats={{ charCount, wordCount, formattedDuration }}
               chunkCount={chunks.length}
-              onSanitize={handleManualSanitize}
+              onSanitize={handleSanitizeText}
+            />
+
+            <ChunkQueue
+              chunks={chunks}
+              activeChunkIndex={activeChunkIndex}
+              isSpeaking={isSpeaking}
+              onPlayChunk={handlePlaySingleChunk}
+            />
+
+            <AudioHistory
+              history={audioHistory}
+              onClearHistory={handleClearHistory}
+              onPlayHistoryItem={handlePlayHistoryItem}
             />
           </div>
 
-          <div className="column-right">
+          {/* Right Column: AI Voice Selector & Audio Visualizer */}
+          <div className="flex flex-col gap-4">
             <VoiceSelector
               systemVoices={systemVoices}
               selectedProfile={selectedProfile}
@@ -362,43 +308,24 @@ export default function App() {
               setPitch={setPitch}
               onPlaySample={handlePlaySample}
               isPlayingSample={isPlayingSample}
-              onStopSample={stopAllSpeech}
+              onStopSample={handleStopSample}
             />
 
-            <div className="card visualizer-card mt-4">
-              <div className="card-header border-b-0 pb-1">
-                <h3 className="card-title text-sm">Real-time Audio Spectrum Equalizer</h3>
-              </div>
-              <AudioVisualizer 
-                isPlaying={isPlaying || isPlayingSample} 
-                isRecording={isRecording} 
-              />
-            </div>
-
-            <ChunkQueue
-              chunks={chunks}
-              activeChunkIndex={activeChunkIndex}
-              isPlaying={isPlaying}
-              onPlaySingleChunk={handlePlaySingleChunk}
-            />
+            <AudioVisualizer isSpeaking={isSpeaking || isPlayingSample} />
           </div>
         </div>
       </main>
 
       <FooterPlayer
-        isPlaying={isPlaying}
+        isSpeaking={isSpeaking}
         isPaused={isPaused}
-        isRecording={isRecording}
-        onPlay={handleStartPlay}
+        onPlay={handlePlayFullSpeech}
         onPause={handlePause}
-        onResume={handleResume}
-        onStop={stopAllSpeech}
-        onGenerateAndDownload={handleGenerateAndDownload}
-        outputFormat={outputFormat}
-        setOutputFormat={setOutputFormat}
-        hasAudioFile={!!lastAudioExport}
-        onDownloadAudio={handleDownloadLastAudio}
-        text={text}
+        onStop={handleStop}
+        onDownload={handleDownload}
+        selectedFormat={selectedFormat}
+        setSelectedFormat={setSelectedFormat}
+        stats={{ charCount, wordCount, formattedDuration }}
       />
     </div>
   );
