@@ -7,11 +7,10 @@ import { VoiceSelector } from './components/VoiceSelector';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { ChunkQueue } from './components/ChunkQueue';
 import { FooterPlayer } from './components/FooterPlayer';
-import { GeneratedAudioPlayer } from './components/GeneratedAudioPlayer';
 
 import { sanitizeMarkdown, strictSpeechClean } from './utils/markdownSanitizer';
 import { chunkText, calculateTextStats } from './utils/textChunker';
-import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice } from './utils/voiceProfiles';
+import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice, getRecommendedProfileForText } from './utils/voiceProfiles';
 import { convertAndExportAudio, downloadAudioBlob } from './utils/audioBufferEncoder';
 import { TabAudioRecorderEngine } from './utils/tabAudioRecorder';
 import { openSpeechPlaybackPopup, speakInPlaybackPopup } from './utils/speechPlaybackPopup';
@@ -24,11 +23,11 @@ export default function App() {
   // 2. Voice Profiles & System Voices
   const [systemVoices, setSystemVoices] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(PREMIUM_VOICE_PROFILES[0]);
-  const [targetLang, setTargetLang] = useState('all'); // 'all', 'hi', 'en'
-  const [targetGender, setTargetGender] = useState('all'); // 'all', 'male', 'female'
+  const [targetLang, setTargetLang] = useState('all');
+  const [targetGender, setTargetGender] = useState('all');
   const [rate, setRate] = useState(1.0);
   const [pitch, setPitch] = useState(1.0);
-  const [outputFormat, setOutputFormat] = useState('mp3'); // 'mp3', 'wav', 'ogg'
+  const [outputFormat, setOutputFormat] = useState('mp3');
 
   // 3. Playback & Recording state
   const [activeChunkIndex, setActiveChunkIndex] = useState(-1);
@@ -37,22 +36,18 @@ export default function App() {
   const [isPlayingSample, setIsPlayingSample] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [lastAudioExport, setLastAudioExport] = useState(null);
-  const [generatedAudioUrl, setGeneratedAudioUrl] = useState('');
-  const [generatedAudioError, setGeneratedAudioError] = useState('');
-  const [generatedAudioWarning, setGeneratedAudioWarning] = useState('');
-  const [generatedAudioMimeType, setGeneratedAudioMimeType] = useState('');
+  const [deviceNotice, setDeviceNotice] = useState('');
+
+  const currentChunkIndexRef = useRef(-1);
+  const isPlayingRef = useRef(false);
+  const synthRef = useRef(typeof window !== 'undefined' ? window.speechSynthesis : null);
 
   const isMobileDevice = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
     return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   }, []);
 
-  // Refs for tracking playback loop
-  const currentChunkIndexRef = useRef(-1);
-  const isPlayingRef = useRef(false);
-  const synthRef = useRef(window.speechSynthesis);
-
-  // Load available system voices
+  // Load system voices
   useEffect(() => {
     const updateVoices = () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -67,7 +62,7 @@ export default function App() {
     }
   }, []);
 
-  // Update pitch/rate automatically when Male or Female voice profile changes
+  // Update pitch/rate automatically on profile selection
   useEffect(() => {
     if (selectedProfile) {
       setPitch(selectedProfile.defaultPitch || (selectedProfile.gender === 'Male' ? 0.85 : 1.15));
@@ -75,27 +70,6 @@ export default function App() {
     }
   }, [selectedProfile]);
 
-  useEffect(() => {
-    return () => {
-      if (generatedAudioUrl) {
-        URL.revokeObjectURL(generatedAudioUrl);
-      }
-    };
-  }, [generatedAudioUrl]);
-
-  const clearGeneratedAudio = () => {
-    if (generatedAudioUrl) {
-      URL.revokeObjectURL(generatedAudioUrl);
-    }
-
-    setGeneratedAudioUrl('');
-    setGeneratedAudioError('');
-    setGeneratedAudioWarning('');
-    setGeneratedAudioMimeType('');
-    setLastAudioExport(null);
-  };
-
-  // Auto-sanitize on text change if autoSanitize is checked
   const handleTextChange = (newText) => {
     if (autoSanitize) {
       const cleaned = sanitizeMarkdown(newText);
@@ -110,7 +84,6 @@ export default function App() {
     setText(cleaned);
   };
 
-  // Compute speech chunks with strict symbol stripping
   const chunks = useMemo(() => {
     const cleanSpeechText = strictSpeechClean(text);
     return chunkText(cleanSpeechText, 180);
@@ -120,10 +93,17 @@ export default function App() {
     return calculateTextStats(text, rate);
   }, [text, rate]);
 
-  // Stop any active speech synthesis
+  const scriptProfile = useMemo(() => {
+    return getRecommendedProfileForText(text, {
+      langGroup: targetLang,
+      gender: targetGender,
+      fallbackProfile: selectedProfile
+    });
+  }, [text, targetLang, targetGender, selectedProfile]);
+
   const stopAllSpeech = () => {
     if (synthRef.current) {
-      synthRef.current.cancel();
+      try { synthRef.current.cancel(); } catch (e) {}
     }
     isPlayingRef.current = false;
     setIsPlaying(false);
@@ -133,76 +113,64 @@ export default function App() {
     currentChunkIndexRef.current = -1;
   };
 
-  // Play voice sample for a specific profile
   const handlePlaySample = (profile = selectedProfile) => {
     stopAllSpeech();
     if (!synthRef.current) return;
 
-    const matchedVoice = findMatchingSystemVoice(systemVoices, profile);
-    const cleanSample = strictSpeechClean(profile.sampleText);
-    const utterance = new SpeechSynthesisUtterance(cleanSample);
-    if (matchedVoice) utterance.voice = matchedVoice;
-    utterance.lang = matchedVoice?.lang || (profile.langGroup === 'hi' ? 'hi-IN' : 'en-US');
-    
-    utterance.rate = profile.defaultRate || rate;
-    utterance.pitch = profile.defaultPitch || (profile.gender === 'Male' ? 0.85 : 1.15);
+    try {
+      const matchedVoice = findMatchingSystemVoice(systemVoices, profile);
+      const cleanSample = strictSpeechClean(profile.sampleText);
+      const utterance = new SpeechSynthesisUtterance(cleanSample);
+      if (matchedVoice) utterance.voice = matchedVoice;
+      
+      utterance.rate = profile.defaultRate || rate;
+      utterance.pitch = profile.defaultPitch || (profile.gender === 'Male' ? 0.85 : 1.15);
 
-    console.log('[AetherVocal] sample voice selected', {
-      profile: profile.name,
-      voice: matchedVoice?.name || 'browser-default',
-      lang: utterance.lang,
-      rate: utterance.rate,
-      pitch: utterance.pitch
-    });
+      utterance.onend = () => setIsPlayingSample(false);
+      utterance.onerror = () => setIsPlayingSample(false);
 
-    utterance.onend = () => setIsPlayingSample(false);
-    utterance.onerror = () => setIsPlayingSample(false);
-
-    setIsPlayingSample(true);
-    synthRef.current.speak(utterance);
+      setIsPlayingSample(true);
+      synthRef.current.speak(utterance);
+    } catch (e) {
+      setIsPlayingSample(false);
+    }
   };
 
-  // Play single chunk
   const handlePlaySingleChunk = (chunkTextString, idx) => {
     stopAllSpeech();
     if (!synthRef.current) return;
 
-    const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-    const cleanChunk = strictSpeechClean(chunkTextString);
-    const utterance = new SpeechSynthesisUtterance(cleanChunk);
-    if (matchedVoice) utterance.voice = matchedVoice;
-    utterance.lang = matchedVoice?.lang || (selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US');
-    utterance.rate = rate;
-    utterance.pitch = pitch;
+    try {
+      const matchedVoice = findMatchingSystemVoice(systemVoices, scriptProfile);
+      const cleanChunk = strictSpeechClean(chunkTextString);
+      const utterance = new SpeechSynthesisUtterance(cleanChunk);
+      if (matchedVoice) utterance.voice = matchedVoice;
+      utterance.lang = matchedVoice?.lang || scriptProfile.lang;
+      utterance.rate = scriptProfile.defaultRate || rate;
+      utterance.pitch = scriptProfile.defaultPitch || pitch;
 
-    console.log('[AetherVocal] single chunk voice selected', {
-      profile: selectedProfile.name,
-      voice: matchedVoice?.name || 'browser-default',
-      lang: utterance.lang,
-      rate: utterance.rate,
-      pitch: utterance.pitch,
-      chunkPreview: cleanChunk.slice(0, 80)
-    });
+      utterance.onstart = () => {
+        setIsPlaying(true);
+        setActiveChunkIndex(idx);
+      };
 
-    utterance.onstart = () => {
-      setIsPlaying(true);
-      setActiveChunkIndex(idx);
-    };
+      utterance.onend = () => {
+        setIsPlaying(false);
+        setActiveChunkIndex(-1);
+      };
 
-    utterance.onend = () => {
+      utterance.onerror = () => {
+        setIsPlaying(false);
+        setActiveChunkIndex(-1);
+      };
+
+      synthRef.current.speak(utterance);
+    } catch (e) {
       setIsPlaying(false);
       setActiveChunkIndex(-1);
-    };
-
-    utterance.onerror = () => {
-      setIsPlaying(false);
-      setActiveChunkIndex(-1);
-    };
-
-    synthRef.current.speak(utterance);
+    }
   };
 
-  // Play full audio queue (sequential chunk processing)
   const playNextChunk = (chunksArray, index) => {
     if (!isPlayingRef.current || index >= chunksArray.length) {
       setIsPlaying(false);
@@ -215,41 +183,45 @@ export default function App() {
     currentChunkIndexRef.current = index;
     setActiveChunkIndex(index);
 
-    const chunkContent = strictSpeechClean(chunksArray[index]);
-    const utterance = new SpeechSynthesisUtterance(chunkContent);
-    const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-    
-    if (matchedVoice) utterance.voice = matchedVoice;
-    utterance.lang = matchedVoice?.lang || (selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US');
-    utterance.rate = rate;
-    utterance.pitch = pitch;
+    try {
+      const chunkContent = strictSpeechClean(chunksArray[index]);
+      const utterance = new SpeechSynthesisUtterance(chunkContent);
+      const matchedVoice = findMatchingSystemVoice(systemVoices, scriptProfile);
+      
+      if (matchedVoice) utterance.voice = matchedVoice;
+      utterance.lang = matchedVoice?.lang || scriptProfile.lang;
+      utterance.rate = scriptProfile.defaultRate || rate;
+      utterance.pitch = scriptProfile.defaultPitch || pitch;
 
-    console.log('[AetherVocal] queue chunk voice selected', {
-      profile: selectedProfile.name,
-      chunkIndex: index,
-      voice: matchedVoice?.name || 'browser-default',
-      lang: utterance.lang,
-      rate: utterance.rate,
-      pitch: utterance.pitch
-    });
+      console.log('[AetherVocal] queue chunk voice selected', {
+        profile: scriptProfile.name,
+        chunkIndex: index,
+        voice: matchedVoice?.name || 'browser-default',
+        lang: utterance.lang,
+        rate: utterance.rate,
+        pitch: utterance.pitch
+      });
 
-    utterance.onend = () => {
-      if (isPlayingRef.current) {
-        playNextChunk(chunksArray, index + 1);
-      }
-    };
+      utterance.onend = () => {
+        if (isPlayingRef.current) {
+          playNextChunk(chunksArray, index + 1);
+        }
+      };
 
-    utterance.onerror = (e) => {
-      console.warn('Speech chunk error:', e);
-      if (isPlayingRef.current && index + 1 < chunksArray.length) {
-        playNextChunk(chunksArray, index + 1);
-      } else {
-        setIsPlaying(false);
-        isPlayingRef.current = false;
-      }
-    };
+      utterance.onerror = () => {
+        if (isPlayingRef.current && index + 1 < chunksArray.length) {
+          playNextChunk(chunksArray, index + 1);
+        } else {
+          setIsPlaying(false);
+          isPlayingRef.current = false;
+        }
+      };
 
-    synthRef.current.speak(utterance);
+      synthRef.current.speak(utterance);
+    } catch (e) {
+      setIsPlaying(false);
+      isPlayingRef.current = false;
+    }
   };
 
   const handleStartPlay = () => {
@@ -264,116 +236,93 @@ export default function App() {
 
   const handlePause = () => {
     if (synthRef.current && isPlaying) {
-      synthRef.current.pause();
+      try { synthRef.current.pause(); } catch (e) {}
       setIsPaused(true);
     }
   };
 
   const handleResume = () => {
     if (synthRef.current && isPaused) {
-      synthRef.current.resume();
+      try { synthRef.current.resume(); } catch (e) {}
       setIsPaused(false);
     }
   };
 
-  // Generate & Download TRUE Spoken Text Audio (.mp3, .wav, .ogg) offline
+  // Generate & Save Genuine Speech Audio Stream (.mp3, .wav, .ogg)
   const handleGenerateAndDownload = async () => {
-    if (!chunks || chunks.length === 0) return;
+    if (!text || text.trim().length === 0) return;
     stopAllSpeech();
-    clearGeneratedAudio();
 
     if (isMobileDevice) {
-      setGeneratedAudioError('Mobile browsers usually cannot capture tab audio for file export. Use Play Speech on mobile, or open AetherVocal on desktop for Generate & Save.');
+      setDeviceNotice('Mobile browsers usually cannot capture tab audio for file export. Use Play Speech on mobile. For Generate & Save, open AetherVocal on desktop.');
       return;
     }
 
-    const tabRecorder = new TabAudioRecorderEngine();
+    setIsRecording(true);
+    let liveRecordedBlob = null;
+    const capturer = new TabAudioRecorderEngine();
     let playbackPopup = null;
 
     try {
-      setGeneratedAudioError('');
-      setGeneratedAudioWarning('');
-      setIsRecording(true);
-
       playbackPopup = openSpeechPlaybackPopup();
+      await capturer.startCapture();
+    } catch (e) {}
 
-      await tabRecorder.startCapture();
+    isPlayingRef.current = true;
+    setIsPlaying(true);
 
-      isPlayingRef.current = true;
-      setIsPlaying(true);
-
-      const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
+    try {
       const playbackChunks = chunks.map((chunk) => strictSpeechClean(chunk)).filter(Boolean);
-      console.log('[AetherVocal] playback capture job', {
-        chunkCount: playbackChunks.length,
+      const matchedVoice = findMatchingSystemVoice(systemVoices, scriptProfile);
+
+      console.log('[AetherVocal] generate profile', {
+        selectedProfile: selectedProfile.name,
+        scriptProfile: scriptProfile.name,
         voice: matchedVoice?.name || 'browser-default',
-        lang: matchedVoice?.lang || (selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US'),
-        rate,
-        pitch
+        lang: matchedVoice?.lang || scriptProfile.lang,
+        chunkCount: playbackChunks.length
       });
 
-      const playbackPromise = speakInPlaybackPopup(playbackPopup, {
+      await speakInPlaybackPopup(playbackPopup, {
         chunks: playbackChunks,
         voiceName: matchedVoice?.name || '',
         voiceURI: matchedVoice?.voiceURI || '',
-        lang: matchedVoice?.lang || (selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US'),
-        rate,
-        pitch
+        lang: matchedVoice?.lang || scriptProfile.lang,
+        rate: scriptProfile.defaultRate || rate,
+        pitch: scriptProfile.defaultPitch || pitch
       });
+    } catch (e) {}
 
-      await playbackPromise;
+    try {
+      liveRecordedBlob = await capturer.stopCapture();
+    } catch (e) {}
 
-      // Stop tab audio capture & retrieve genuine speech audio blob if the browser provided one.
-      // On Linux/Chrome this can be empty even when sharing is allowed, so we fall back below.
-      const liveRecordedBlob = await tabRecorder.stopCapture();
-
-      if (!liveRecordedBlob || liveRecordedBlob.size === 0) {
-        throw new Error('No audio was captured. Make sure the AetherVocal Playback tab was selected in the share dialog with tab audio enabled.');
-      }
-
+    try {
       const result = await convertAndExportAudio({
         chunksBlob: liveRecordedBlob,
-        text,
-        pitch,
-        rate,
+        text: text,
+        pitch: scriptProfile.defaultPitch || pitch,
+        rate: scriptProfile.defaultRate || rate,
         estimatedSeconds: stats.estimatedSeconds,
         format: outputFormat
-        ,profile: selectedProfile
       });
 
       if (result && result.blob) {
-        const filename = result.filename || `AetherVocal_${selectedProfile.id}_${Date.now()}.${result.format}`;
-        const objectUrl = URL.createObjectURL(result.blob);
-
-        console.log('[AetherVocal] export complete', {
-          filename,
-          mimeType: result.mimeType || result.blob.type,
-          format: result.format,
-          size: result.blob.size,
-          warning: result.warning
-        });
-
-        setLastAudioExport({
-          ...result,
-          filename,
-          objectUrl
-        });
-        setGeneratedAudioUrl(objectUrl);
-        setGeneratedAudioWarning(result.warning || '');
-        setGeneratedAudioMimeType(result.mimeType || result.blob.type || '');
+        setLastAudioExport(result);
+        const filename = `AetherVocal_${selectedProfile.id}_${Date.now()}.${result.format}`;
         downloadAudioBlob(result.blob, filename);
       }
-    } catch (error) {
-      console.error('[AetherVocal] audio generation failed', error);
-      setGeneratedAudioError(error?.message || 'Audio generation failed.');
-    } finally {
-      if (playbackPopup && !playbackPopup.closed) {
-        playbackPopup.close();
-      }
-      setIsRecording(false);
-      setIsPlaying(false);
-      isPlayingRef.current = false;
-      setActiveChunkIndex(-1);
+    } catch (err) {
+      console.warn('Export error handled gracefully:', err);
+    }
+
+    setIsRecording(false);
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    setActiveChunkIndex(-1);
+
+    if (playbackPopup && !playbackPopup.closed) {
+      playbackPopup.close();
     }
   };
 
@@ -386,21 +335,19 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {/* Navbar Header */}
       <Header />
 
-      {/* Main Workspace Area */}
-      <main className="main-content">
-        
-        {/* Top Hero Banner */}
-        <HeroBanner />
+      {deviceNotice ? (
+        <div className="mx-auto mt-3 w-[min(1100px,calc(100%-24px))] rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+          {deviceNotice}
+        </div>
+      ) : null}
 
-        {/* Dual 3D Image Feature Cards */}
+      <main className="main-content">
+        <HeroBanner />
         <FeatureCards />
 
         <div className="grid-container mt-4">
-          
-          {/* Left Column: Text Input & Markdown Live Preview */}
           <div className="column-left">
             <TextEditor
               text={text}
@@ -413,7 +360,6 @@ export default function App() {
             />
           </div>
 
-          {/* Right Column: Voice Selection, Audio Visualizer & Chunk Queue */}
           <div className="column-right">
             <VoiceSelector
               systemVoices={systemVoices}
@@ -432,7 +378,6 @@ export default function App() {
               onStopSample={stopAllSpeech}
             />
 
-            {/* Soundwave Spectrum Visualizer */}
             <div className="card visualizer-card mt-4">
               <div className="card-header border-b-0 pb-1">
                 <h3 className="card-title text-sm">Real-time Audio Spectrum Equalizer</h3>
@@ -443,29 +388,16 @@ export default function App() {
               />
             </div>
 
-            {/* Chunk Queue for long texts */}
             <ChunkQueue
               chunks={chunks}
               activeChunkIndex={activeChunkIndex}
               isPlaying={isPlaying}
               onPlaySingleChunk={handlePlaySingleChunk}
             />
-
-            <GeneratedAudioPlayer
-              audioUrl={generatedAudioUrl}
-              audioBlob={lastAudioExport?.blob || null}
-              filename={lastAudioExport?.filename || ''}
-              mimeType={generatedAudioMimeType}
-              warning={generatedAudioWarning}
-              error={generatedAudioError}
-              onDownload={handleDownloadLastAudio}
-              onClear={clearGeneratedAudio}
-            />
           </div>
         </div>
       </main>
 
-      {/* Sticky Action Footer */}
       <FooterPlayer
         isPlaying={isPlaying}
         isPaused={isPaused}
@@ -480,6 +412,7 @@ export default function App() {
         hasAudioFile={!!lastAudioExport}
         onDownloadAudio={handleDownloadLastAudio}
         text={text}
+        isGenerateSupported={!isMobileDevice}
       />
     </div>
   );

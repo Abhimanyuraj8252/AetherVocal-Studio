@@ -23,13 +23,22 @@ export class TabAudioRecorderEngine {
       if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
         try {
           this.stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
             audio: {
               echoCancellation: false,
               noiseSuppression: false,
               autoGainControl: false
             },
-            video: false
           });
+
+          const videoTracks = this.stream.getVideoTracks();
+          if (videoTracks.length > 0) {
+            videoTracks.forEach(track => track.stop());
+          }
+
+          const audioTracks = this.stream.getAudioTracks();
+          this.stream = new MediaStream(audioTracks);
+
           console.log('[AetherVocal] tab audio capture started', {
             trackCount: this.stream?.getTracks?.().length || 0,
             trackKinds: this.stream?.getTracks?.().map(track => track.kind) || []
@@ -45,6 +54,8 @@ export class TabAudioRecorderEngine {
         this.audioContext = new AudioCtx();
         const destination = this.audioContext.createMediaStreamDestination();
         this.stream = destination.stream;
+
+        console.log('[AetherVocal] tab audio fallback stream created from AudioContext');
       }
 
       // 3. Determine best supported recording mimeType

@@ -1,274 +1,222 @@
 /**
- * Voice Profiles & Multi-Voice Engine v3
- * Defines curated Hindi & English Male & Female voice profiles
- * with automatic pitch, rate, and gender formant bindings.
+ * Curated Premium Voice Profiles for Hindi & English TTS Synthesis
+ * Default speaking rate is strictly set to 1.0 (1x speed).
  */
 
 export const PREMIUM_VOICE_PROFILES = [
-  // 🇮🇳 HINDI FEMALE VOICES
   {
-    id: 'hi_female_swara',
-    name: 'Hindi Female — Swara (Storyteller)',
-    langGroup: 'hi',
-    langLabel: 'Hindi (हिंदी)',
-    gender: 'Female',
-    avatar: '👩‍💼',
-    voiceRole: 'story',
-    style: 'Warm & Expressive Storyteller',
-    sampleText: 'नमस्ते! मैं स्वरा हूँ। मेरी आवाज़ हिंदी कहानियों, ऑडियोबुक और भावनात्मक narration के लिए बहुत सहज है।',
-    matchingNames: ['swara', 'google हिन्दी', 'google hindi', 'kalpana', 'veena', 'female', 'story', 'narrator'],
-    defaultPitch: 1.1,
-    defaultRate: 0.95
-  },
-  {
-    id: 'hi_female_neerja',
-    name: 'Hindi Female — Neerja (News Anchor)',
-    langGroup: 'hi',
-    langLabel: 'Hindi (हिंदी)',
-    gender: 'Female',
-    avatar: '👩‍💻',
-    voiceRole: 'news',
-    style: 'Professional & Clear News Anchor',
-    sampleText: 'मुख्य समाचारों में आपका स्वागत है। आज की प्रमुख खबरें और ताजा अपडेट्स स्पष्ट, भरोसेमंद और पेशेवर अंदाज़ में सुनिए।',
-    matchingNames: ['neerja', 'shruti', 'pooja', 'kavya', 'female', 'news', 'anchor', 'reporter'],
-    defaultPitch: 1.15,
-    defaultRate: 1.0
-  },
-  {
-    id: 'hi_female_priya',
-    name: 'Hindi Female — Priya (Tech Host)',
-    langGroup: 'hi',
-    langLabel: 'Hindi (हिंदी)',
-    gender: 'Female',
-    avatar: '👩‍🏫',
-    voiceRole: 'tech',
-    style: 'Calm, Soft & Educational',
-    sampleText: 'नमस्ते! मैं प्रिया हूँ। मैं टेक explainers, tutorials, product walkthroughs और educational content के लिए उपयुक्त हूँ।',
-    matchingNames: ['priya', 'ananya', 'aditi', 'female', 'tech', 'tutorial', 'guide'],
-    defaultPitch: 1.2,
-    defaultRate: 0.9
-  },
-
-  // 🇮🇳 HINDI MALE VOICES
-  {
-    id: 'hi_male_hemant',
-    name: 'Hindi Male — Hemant (Storyteller)',
-    langGroup: 'hi',
-    langLabel: 'Hindi (हिंदी)',
-    gender: 'Male',
-    avatar: '👨‍💼',
-    voiceRole: 'story',
-    style: 'Deep, Rich & Commandive Narrator',
-    sampleText: 'नमस्कार! मैं हेमंत हूँ। मेरी गहरी, स्पष्ट और प्रभावशाली आवाज़ हिंदी कहानियों, ऑडियोबुक और documentary narration के लिए उपयुक्त है।',
-    matchingNames: ['hemant', 'rishi', 'arjun', 'kabir', 'male', 'guy', 'man', 'story', 'narrator'],
-    defaultPitch: 0.82,
-    defaultRate: 0.95
-  },
-  {
-    id: 'hi_male_madhur',
-    name: 'Hindi Male — Madhur (News Anchor)',
-    langGroup: 'hi',
-    langLabel: 'Hindi (हिंदी)',
-    gender: 'Male',
-    avatar: '👨‍🎤',
-    voiceRole: 'news',
-    style: 'Energetic & Modern News Presenter',
-    sampleText: 'नमस्कार! मैं मधुर हूँ। आज की प्रमुख खबरें, ताज़ा अपडेट्स और important headlines अब सुनिए साफ़, तेज़ और भरोसेमंद अंदाज़ में।',
-    matchingNames: ['madhur', 'amit', 'ravi', 'male', 'guy', 'news', 'anchor', 'reporter'],
-    defaultPitch: 0.88,
-    defaultRate: 1.05
-  },
-  {
-    id: 'hi_male_kabir',
-    name: 'Hindi Male — Kabir (Tech Host)',
-    langGroup: 'hi',
-    langLabel: 'Hindi (हिंदी)',
-    gender: 'Male',
-    avatar: '👨‍🎨',
-    voiceRole: 'tech',
-    style: 'Poetic & Cinematic Voice',
-    sampleText: 'आज हम एक आधुनिक टेक topic को आसान हिंदी में समझेंगे, step by step, ताकि हर listener को clear and practical explanation मिले।',
-    matchingNames: ['kabir', 'arjun', 'rishi', 'male', 'tech', 'tutorial', 'guide'],
-    defaultPitch: 0.85,
-    defaultRate: 0.9
-  },
-
-  // 🇬🇧 ENGLISH FEMALE VOICES
-  {
-    id: 'en_female_aria',
-    name: 'English Female — Aria (Storyteller)',
-    langGroup: 'en',
-    langLabel: 'English (US)',
+    id: 'hindi_female_nisha',
+    name: 'Nisha (निशा) • Hindi Female',
+    lang: 'hi-IN',
     gender: 'Female',
     avatar: '🎙️',
-    voiceRole: 'story',
-    style: 'Smooth, Natural & Friendly Studio Voice',
-    sampleText: 'Hello there! I am Aria. I deliver warm storytelling for audiobooks, podcasts, and immersive scripts.',
-    matchingNames: ['aria', 'zira', 'catherine', 'susan', 'samantha', 'jenny', 'female', 'story', 'narrator'],
-    defaultPitch: 1.1,
+    description: 'Warm, clear & expressive Hindi female voice',
+    voiceRole: 'news',
+    keywords: ['hi-in', 'hindi', 'female', 'nisha', 'google हिन्दी', 'swara', 'kalpana'],
+    sampleText: 'नमस्ते! ऐथरवोकल स्टूडियो में आपका स्वागत है।',
+    defaultPitch: 1.15,
     defaultRate: 1.0
   },
   {
-    id: 'en_female_zira',
-    name: 'English Female — Zira (News Anchor)',
-    langGroup: 'en',
-    langLabel: 'English (US)',
-    gender: 'Female',
-    avatar: '💼',
-    voiceRole: 'news',
-    style: 'Articulate & Crisp Presentation Voice',
-    sampleText: 'Welcome to our news update. Here are today’s headlines, delivered with clarity, pace, and authority.',
-    matchingNames: ['zira', 'victoria', 'karen', 'fiona', 'hazel', 'female', 'news', 'anchor', 'reporter'],
-    defaultPitch: 1.15,
-    defaultRate: 1.05
-  },
-  {
-    id: 'en_female_sonia',
-    name: 'English Female — Sonia (Tech Host)',
-    langGroup: 'en',
-    langLabel: 'English (India)',
-    gender: 'Female',
-    avatar: '🇮🇳',
-    voiceRole: 'tech',
-    style: 'Warm Indian Accent Accentuated Speech',
-    sampleText: 'Hello! I am Sonia. I provide clear Indian-accented English speech for tutorials, product walkthroughs, and explainers.',
-    matchingNames: ['sonia', 'veena', 'heera', 'female', 'tech', 'tutorial', 'guide'],
-    defaultPitch: 1.1,
-    defaultRate: 0.95
-  },
-
-  // 🇬🇧 ENGLISH MALE VOICES
-  {
-    id: 'en_male_guy',
-    name: 'English Male — Guy (Storyteller)',
-    langGroup: 'en',
-    langLabel: 'English (US)',
+    id: 'hindi_male_rohit',
+    name: 'Rohit (रोहित) • Hindi Male',
+    lang: 'hi-IN',
     gender: 'Male',
-    avatar: '📻',
-    voiceRole: 'story',
-    style: 'Deep, Resonant & Authority Voice',
-    sampleText: 'In a world of constant evolution, this narrator delivers cinematic storytelling with depth and presence.',
-    matchingNames: ['guy', 'david', 'mark', 'george', 'richard', 'alex', 'male', 'man', 'story', 'narrator'],
-    defaultPitch: 0.8,
-    defaultRate: 0.95
-  },
-  {
-    id: 'en_male_david',
-    name: 'English Male — David (News Anchor)',
-    langGroup: 'en',
-    langLabel: 'English (US)',
-    gender: 'Male',
-    avatar: '💻',
+    avatar: '👨‍🎤',
+    description: 'Deep, confident & professional Hindi male voice',
     voiceRole: 'news',
-    style: 'Clean, Modern & Confident Voice',
-    sampleText: 'Welcome to the news desk. Today’s headlines are presented clearly, professionally, and with confident pacing.',
-    matchingNames: ['david', 'james', 'daniel', 'male', 'man', 'news', 'anchor', 'reporter'],
+    keywords: ['hi-in', 'hindi', 'male', 'rohit', 'google हिन्दी', 'hemant', 'madhav'],
+    sampleText: 'नमस्कार! मैं रोहित हूँ। आज हम एक नया ऑडियो प्रोजेक्ट बना रहे हैं।',
     defaultPitch: 0.85,
     defaultRate: 1.0
   },
   {
-    id: 'en_male_rishi',
-    name: 'English Male — Rishi (Tech Host)',
-    langGroup: 'en',
-    langLabel: 'English (India)',
+    id: 'english_female_aria',
+    name: 'Aria • English US Female',
+    lang: 'en-US',
+    gender: 'Female',
+    avatar: '👩‍💼',
+    description: 'Crisp, natural & polished US English female voice',
+    voiceRole: 'story',
+    keywords: ['en-us', 'english', 'female', 'aria', 'zira', 'samantha', 'jenny'],
+    sampleText: 'Welcome to AetherVocal Studio! Experience high quality speech synthesis.',
+    defaultPitch: 1.10,
+    defaultRate: 1.0
+  },
+  {
+    id: 'english_male_alex',
+    name: 'Alex • English US Male',
+    lang: 'en-US',
     gender: 'Male',
     avatar: '👨‍💼',
+    description: 'Smooth, resonant & authoritative US English male voice',
     voiceRole: 'tech',
-    style: 'Professional Indian English Voice',
-    sampleText: 'Good day! I am Rishi. I’m tailored for technical tutorials, product walkthroughs, and practical English content.',
-    matchingNames: ['rishi', 'prabhat', 'male', 'man', 'tech', 'tutorial', 'guide'],
-    defaultPitch: 0.82,
-    defaultRate: 0.95
+    keywords: ['en-us', 'english', 'male', 'alex', 'david', 'guy', 'natural male'],
+    sampleText: 'Hello there! Alex here. Ready to convert your script into studio audio.',
+    defaultPitch: 0.85,
+    defaultRate: 1.0
+  },
+  {
+    id: 'hindi_female_kavya',
+    name: 'Kavya (काव्या) • Storyteller Female',
+    lang: 'hi-IN',
+    gender: 'Female',
+    avatar: '📖',
+    description: 'Soft, melodious & dramatic storytelling voice',
+    voiceRole: 'story',
+    keywords: ['hi-in', 'hindi', 'story', 'kavya', 'female'],
+    sampleText: 'एक समय की बात है, जब जंगलों में एक जादुई झरना बहता था।',
+    defaultPitch: 1.20,
+    defaultRate: 1.0
+  },
+  {
+    id: 'hindi_male_kabir',
+    name: 'Kabir (कबीर) • Documentary Male',
+    lang: 'hi-IN',
+    gender: 'Male',
+    avatar: '🎙️',
+    description: 'Heavy, rich & engaging documentary narrator',
+    voiceRole: 'story',
+    keywords: ['hi-in', 'hindi', 'kabir', 'documentary', 'male'],
+    sampleText: 'ब्रह्मांड के इस विशाल विस्तार में कई रहस्य छिपे हुए हैं।',
+    defaultPitch: 0.80,
+    defaultRate: 1.0
+  },
+  {
+    id: 'english_uk_emma',
+    name: 'Emma • English UK Female',
+    lang: 'en-GB',
+    gender: 'Female',
+    avatar: '👑',
+    description: 'Elegant British English female voice',
+    voiceRole: 'news',
+    keywords: ['en-gb', 'uk', 'english', 'female', 'emma', 'hazel', 'sonia'],
+    sampleText: 'Good day! I am delighted to help you create your narration.',
+    defaultPitch: 1.12,
+    defaultRate: 1.0
+  },
+  {
+    id: 'english_uk_oliver',
+    name: 'Oliver • English UK Male',
+    lang: 'en-GB',
+    gender: 'Male',
+    avatar: '🎩',
+    description: 'Classic British English male voice',
+    voiceRole: 'story',
+    keywords: ['en-gb', 'uk', 'english', 'male', 'oliver', 'george', 'ryan'],
+    sampleText: 'Greetings. Let us produce an exceptional voiceover for your script.',
+    defaultPitch: 0.88,
+    defaultRate: 1.0
+  },
+  {
+    id: 'hinglish_female_riya',
+    name: 'Riya (रिया) • Hinglish Conversational',
+    lang: 'hi-IN',
+    gender: 'Female',
+    avatar: '🎧',
+    description: 'Casual, modern Indian Hinglish female tone',
+    voiceRole: 'conversational',
+    keywords: ['hi-in', 'en-in', 'hinglish', 'riya', 'female'],
+    sampleText: 'Hey guys! Aaj hum aek super cool video topic cover karne wale hain.',
+    defaultPitch: 1.15,
+    defaultRate: 1.0
+  },
+  {
+    id: 'hinglish_male_arjun',
+    name: 'Arjun (अर्जुन) • Hinglish Tech/Vlog',
+    lang: 'hi-IN',
+    gender: 'Male',
+    avatar: '📱',
+    description: 'Energetic Tech & Gaming Vlogger Hinglish male tone',
+    voiceRole: 'tech',
+    keywords: ['hi-in', 'en-in', 'hinglish', 'arjun', 'male'],
+    sampleText: 'What is up everyone! Tech review video me aapka welcome hai.',
+    defaultPitch: 0.85,
+    defaultRate: 1.0
+  },
+  {
+    id: 'english_in_priya',
+    name: 'Priya • Indian English Female',
+    lang: 'en-IN',
+    gender: 'Female',
+    avatar: '👩‍🏫',
+    description: 'Clear, formal Indian English female voice',
+    voiceRole: 'news',
+    keywords: ['en-in', 'indian english', 'female', 'priya', 'neerja'],
+    sampleText: 'Welcome to today\'s presentation. Let us begin the overview.',
+    defaultPitch: 1.15,
+    defaultRate: 1.0
+  },
+  {
+    id: 'english_in_vikram',
+    name: 'Vikram • Indian English Male',
+    lang: 'en-IN',
+    gender: 'Male',
+    avatar: '💼',
+    description: 'Professional Indian English male corporate voice',
+    voiceRole: 'news',
+    keywords: ['en-in', 'indian english', 'male', 'vikram', 'prabhat'],
+    sampleText: 'Hello team. Here is the summary of our quarterly metrics.',
+    defaultPitch: 0.85,
+    defaultRate: 1.0
   }
 ];
+
+const STORY_KEYWORDS = ['story', 'storyteller', 'once upon', 'एक समय', 'कहानी', 'narrate', 'narration', 'novel', 'poem', 'documentary'];
+const NEWS_KEYWORDS = ['news', 'headline', 'headlines', 'breaking', 'update', 'bulletin', 'report', 'reporter', 'newsroom', 'समाचार', 'खबर', 'ताज़ा'];
+const TECH_KEYWORDS = ['tech', 'technology', 'software', 'code', 'coding', 'app', 'ai', 'api', 'tutorial', 'guide', 'product', 'feature', 'bug', 'dev', 'developer', 'system'];
+const CONVERSATIONAL_KEYWORDS = ['hello', 'hey', 'vlog', 'conversation', 'chat', 'casual', 'intro', 'welcome', 'friends', 'guys', 'दोस्तों'];
+
+export function inferScriptRole(text = '') {
+  const content = (text || '').toLowerCase();
+
+  const counts = {
+    story: STORY_KEYWORDS.filter(keyword => content.includes(keyword.toLowerCase())).length,
+    news: NEWS_KEYWORDS.filter(keyword => content.includes(keyword.toLowerCase())).length,
+    tech: TECH_KEYWORDS.filter(keyword => content.includes(keyword.toLowerCase())).length,
+    conversational: CONVERSATIONAL_KEYWORDS.filter(keyword => content.includes(keyword.toLowerCase())).length
+  };
+
+  const ordered = Object.entries(counts).sort((left, right) => right[1] - left[1]);
+  if (!ordered.length || ordered[0][1] === 0) return 'general';
+  return ordered[0][0];
+}
+
+export function getRecommendedProfileForText(text, { langGroup = 'all', gender = 'all', fallbackProfile = null } = {}) {
+  const scriptRole = inferScriptRole(text);
+  const candidates = PREMIUM_VOICE_PROFILES.filter(profile => {
+    if (langGroup !== 'all' && profile.lang.slice(0, 2).toLowerCase() !== langGroup) return false;
+    if (gender !== 'all' && profile.gender.toLowerCase() !== gender.toLowerCase()) return false;
+    return true;
+  });
+
+  const roleMatches = candidates.filter(profile => {
+    if (scriptRole === 'general') return true;
+    return profile.voiceRole === scriptRole;
+  });
+
+  return roleMatches[0] || candidates[0] || fallbackProfile || PREMIUM_VOICE_PROFILES[0];
+}
 
 export function findMatchingSystemVoice(systemVoices, profile) {
   if (!systemVoices || systemVoices.length === 0) return null;
 
-  const targetGenderLower = (profile.gender || '').toLowerCase();
-  const targetLangGroup = profile.langGroup;
-  const profileOrder = {
-    hi_female_swara: 0,
-    hi_female_neerja: 1,
-    hi_female_priya: 2,
-    hi_male_hemant: 0,
-    hi_male_madhur: 1,
-    hi_male_kabir: 2,
-    en_female_aria: 0,
-    en_female_zira: 1,
-    en_female_sonia: 2,
-    en_male_guy: 0,
-    en_male_david: 1,
-    en_male_rishi: 2
-  };
+  const profileLangGroup = profile.lang.slice(0, 2).toLowerCase();
+  const isTargetFemale = profile.gender === 'Female';
 
-  const exactLanguageTags = targetLangGroup === 'hi'
-    ? ['hi', 'hi-in', 'hindi']
-    : targetLangGroup === 'en'
-      ? ['en', 'en-us', 'en-gb', 'en-in']
-      : [];
-
-  const scoredCandidates = systemVoices.map((voice, index) => {
-    const vName = (voice.name || '').toLowerCase();
-    const vLang = (voice.lang || '').toLowerCase();
-    const langMatches = exactLanguageTags.length === 0
-      ? true
-      : exactLanguageTags.some(tag => vLang.startsWith(tag) || vName.includes(tag) || (tag === 'hindi' && vName.includes('hindi')));
-
-    const isMale = vName.includes('male') || vName.includes('man') || vName.includes('hemant') || vName.includes('david') || vName.includes('guy') || vName.includes('rishi');
-    const isFemale = vName.includes('female') || vName.includes('woman') || vName.includes('zira') || vName.includes('aria') || vName.includes('swara') || vName.includes('neerja') || vName.includes('priya');
-
-    let score = 0;
-    if (langMatches) score += 12;
-    if (targetGenderLower === 'male' && isMale) score += 8;
-    if (targetGenderLower === 'female' && isFemale) score += 8;
-    if (voice.localService) score += 2;
-    if (vName.includes('google') || vName.includes('natural') || vName.includes('neural')) score += 1;
-
-    for (const matchName of profile.matchingNames || []) {
-      if (vName.includes(matchName.toLowerCase())) {
-        score += 12;
-        break;
-      }
-    }
-
-    return { voice, score, index };
+  let match = systemVoices.find(v => {
+    const vName = v.name.toLowerCase();
+    const vLang = v.lang.toLowerCase();
+    const matchesLang = vLang.includes(profile.lang.toLowerCase()) || vLang.startsWith(profileLangGroup);
+    const matchesGender = isTargetFemale
+      ? (vName.includes('female') || vName.includes('woman') || vName.includes('zira') || vName.includes('swara') || vName.includes('samantha') || vName.includes('aria') || vName.includes('nisha'))
+      : (vName.includes('male') || vName.includes('man') || vName.includes('david') || vName.includes('rohit') || vName.includes('alex') || vName.includes('kabir') || vName.includes('arjun'));
+    return matchesLang && matchesGender;
   });
 
-  const sortedCandidates = scoredCandidates
-    .filter(item => item.score > 0)
-    .sort((left, right) => right.score - left.score || left.index - right.index);
-
-  if (sortedCandidates.length > 0) {
-    console.log('[AetherVocal] resolved system voice', {
-      profile: profile.name,
-      selectedVoice: sortedCandidates[0].voice.name,
-      language: sortedCandidates[0].voice.lang,
-      score: sortedCandidates[0].score
-    });
-    return sortedCandidates[0].voice;
+  if (!match) {
+    match = systemVoices.find(v => v.lang.toLowerCase().startsWith(profileLangGroup));
   }
 
-  const languageCandidates = systemVoices.filter(voice => {
-    const vName = (voice.name || '').toLowerCase();
-    const vLang = (voice.lang || '').toLowerCase();
-    if (profile.langGroup === 'hi') return vLang.startsWith('hi') || vName.includes('hindi');
-    if (profile.langGroup === 'en') return vLang.startsWith('en');
-    return true;
-  });
-
-  if (languageCandidates.length > 0) {
-    const preferredIndex = profileOrder[profile.id] ?? 0;
-    const fallbackVoice = languageCandidates[preferredIndex % languageCandidates.length];
-    console.log('[AetherVocal] fallback system voice', {
-      profile: profile.name,
-      selectedVoice: fallbackVoice?.name,
-      language: fallbackVoice?.lang,
-      bucketIndex: preferredIndex,
-      candidateCount: languageCandidates.length
-    });
-    return fallbackVoice;
-  }
-
-  return systemVoices[0];
+  return match || systemVoices[0] || null;
 }

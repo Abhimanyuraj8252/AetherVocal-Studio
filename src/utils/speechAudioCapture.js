@@ -23,6 +23,7 @@ export class SpeechAudioStreamRecorder {
       this.audioContext = new AudioCtx();
       const destination = this.audioContext.createMediaStreamDestination();
       this.stream = destination.stream;
+      console.log('[AetherVocal] speech audio fallback stream created from AudioContext');
 
       // 2. Determine best supported recording mimeType
       let mimeType = 'audio/webm;codecs=opus';
