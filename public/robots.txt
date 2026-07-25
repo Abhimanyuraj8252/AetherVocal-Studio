@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /scratch/
-Disallow: /api/
-
-Sitemap: https://aethervocal.studio/sitemap.xml
