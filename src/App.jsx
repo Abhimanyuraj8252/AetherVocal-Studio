@@ -10,7 +10,7 @@ import { FooterPlayer } from './components/FooterPlayer';
 import { AudioHistory } from './components/AudioHistory';
 import { PREMIUM_VOICE_PROFILES, findMatchingSystemVoice } from './utils/voiceProfiles';
 import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
-import { SpeechCaptureEngine } from './utils/SpeechCaptureEngine';
+import { FormantSpeechSynthesizer } from './utils/FormantSpeechSynthesizer';
 
 export default function App() {
   const [theme, setTheme] = useState('dark');
@@ -254,7 +254,7 @@ export default function App() {
     setIsPlayingSample(false);
   }, []);
 
-  // ─── DOWNLOAD: REAL SPEECH AUDIO CAPTURE ───
+  // ─── DOWNLOAD: FORMANT SPEECH SYNTHESIS (MOBILE + PC SAFE) ───
   const handleDownload = useCallback(async () => {
     if (!text.trim() || isGenerating) return;
 
@@ -271,37 +271,30 @@ export default function App() {
     setDownloadError('');
 
     try {
-      // Check if tab audio capture is supported
-      if (!SpeechCaptureEngine.isSupported()) {
-        throw new Error('CAPTURE_FAILED');
-      }
-
-      const matchVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-
-      // Capture REAL speech audio from the browser tab
-      const result = await SpeechCaptureEngine.captureSpokenAudio(
-        text,
-        matchVoice,
+      // Synthesize character-based formant speech WAV blob
+      const wavBlob = FormantSpeechSynthesizer.synthesize(text, {
+        gender: selectedProfile?.gender || 'Female',
         pitch,
         rate
-      );
+      });
 
-      if (!result.blob || result.blob.size < 500) {
-        throw new Error('EMPTY_RECORDING');
+      if (!wavBlob || wavBlob.size < 100) {
+        throw new Error('Audio generation failed. Text is empty or invalid.');
       }
 
-      const filename = `AetherVocal_${selectedProfile.id || 'Speech'}.${result.extension}`;
+      const ext = selectedFormat === 'wav' ? 'wav' : 'wav'; // Formant synth outputs WAV PCM
+      const filename = `AetherVocal_${selectedProfile?.id || 'Speech'}.${ext}`;
 
-      // Trigger download
-      MobileSafeAudioExporter.download(result.blob, filename);
+      // Trigger download using mobile-safe exporter
+      MobileSafeAudioExporter.download(wavBlob, filename);
 
-      // Save to audio history (text snippet, not blob — survives page reload)
+      // Save to audio history
       const historyItem = {
         id: Date.now().toString(),
         title: text.slice(0, 40) + (text.length > 40 ? '...' : ''),
-        voiceName: selectedProfile.name,
+        voiceName: selectedProfile?.name || 'Standard Voice',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        format: result.extension,
+        format: 'WAV',
         filename,
         textSnippet: text.slice(0, 200)
       };
@@ -314,11 +307,11 @@ export default function App() {
 
     } catch (err) {
       console.warn('Audio download error:', err);
-      setDownloadError(SpeechCaptureEngine.getErrorMessage(err));
+      setDownloadError(err?.message || 'Audio generate nahi ho saka. Kripya punah prayas karein.');
     } finally {
       setIsGenerating(false);
     }
-  }, [text, isGenerating, systemVoices, selectedProfile, pitch, rate, audioHistory, prepareSpeechExecution]);
+  }, [text, isGenerating, selectedProfile, pitch, rate, selectedFormat, audioHistory, prepareSpeechExecution]);
 
   // ─── HISTORY ACTIONS ───
   const handleClearHistory = useCallback(() => {
