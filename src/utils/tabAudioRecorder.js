@@ -30,6 +30,10 @@ export class TabAudioRecorderEngine {
             },
             video: false
           });
+          console.log('[AetherVocal] tab audio capture started', {
+            trackCount: this.stream?.getTracks?.().length || 0,
+            trackKinds: this.stream?.getTracks?.().map(track => track.kind) || []
+          });
         } catch (e) {
           console.warn('Tab audio getDisplayMedia fallback to AudioContext stream:', e);
         }
@@ -54,6 +58,11 @@ export class TabAudioRecorderEngine {
 
       const options = mimeType ? { mimeType } : {};
       this.mediaRecorder = new MediaRecorder(this.stream, options);
+
+      console.log('[AetherVocal] media recorder initialized', {
+        requestedMimeType: mimeType || 'browser-default',
+        actualMimeType: this.mediaRecorder.mimeType || 'browser-default'
+      });
 
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
@@ -84,6 +93,12 @@ export class TabAudioRecorderEngine {
       this.mediaRecorder.onstop = () => {
         const mimeType = this.mediaRecorder.mimeType || 'audio/webm';
         const blob = new Blob(this.audioChunks, { type: mimeType });
+
+        console.log('[AetherVocal] tab audio capture stopped', {
+          chunkCount: this.audioChunks.length,
+          blobSize: blob.size,
+          mimeType
+        });
 
         // Stop media tracks
         if (this.stream) {

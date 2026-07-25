@@ -1,126 +1,180 @@
-/**
- * Dual-Engine Multi-Format Audio Exporter
- * Guarantees 100% valid, non-zero .mp3, .wav, and .ogg file downloads.
- */
+const FORMAT_TO_MIME = {
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  webm: 'audio/webm',
+  m4a: 'audio/mp4'
+};
 
-export function downloadAudioBlob(blob, filename = 'aethervocal_speech.mp3') {
+const MIME_TO_EXT = {
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/ogg': 'ogg',
+  'audio/oga': 'ogg',
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/aac': 'm4a'
+};
+
+function normalizeMimeType(mimeType = '') {
+  return mimeType.split(';')[0].trim().toLowerCase();
+}
+
+function detectErrorMessageFromText(text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return 'TTS service returned an empty response instead of audio.';
+
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parsed.error || parsed.message || parsed.detail || JSON.stringify(parsed);
+    } catch (error) {
+      return trimmed.slice(0, 300);
+    }
+  }
+
+  if (/<html|<!doctype/i.test(trimmed)) {
+    return 'TTS service returned HTML instead of audio.';
+  }
+
+  return trimmed.slice(0, 300);
+}
+
+async function coerceToAudioBlob(source, { preferredFormat = 'webm' } = {}) {
+  if (!source) {
+    throw new Error('No audio payload was returned.');
+  }
+
+  if (typeof Response !== 'undefined' && source instanceof Response) {
+    const contentType = normalizeMimeType(source.headers.get('content-type') || '');
+    console.log('[AetherVocal] TTS response', {
+      ok: source.ok,
+      status: source.status,
+      statusText: source.statusText,
+      contentType
+    });
+
+    if (!source.ok) {
+      const text = await source.text();
+      throw new Error(`TTS request failed (${source.status} ${source.statusText}): ${detectErrorMessageFromText(text)}`);
+    }
+
+    if (contentType && !contentType.startsWith('audio/')) {
+      const bodyText = await source.text();
+      throw new Error(`Expected audio response but received ${contentType || 'unknown content type'}: ${detectErrorMessageFromText(bodyText)}`);
+    }
+
+    const arrayBuffer = await source.arrayBuffer();
+    const mimeType = contentType || FORMAT_TO_MIME[preferredFormat] || 'audio/webm';
+    return new Blob([arrayBuffer], { type: mimeType });
+  }
+
+  if (source instanceof Blob) {
+    const mimeType = normalizeMimeType(source.type || '');
+    console.log('[AetherVocal] Audio blob received', { size: source.size, type: mimeType || source.type || 'unknown' });
+
+    if (source.size === 0) {
+      throw new Error('The recorded audio blob is empty.');
+    }
+
+    if (mimeType && !mimeType.startsWith('audio/')) {
+      const preview = await source.slice(0, 512).text().catch(() => '');
+      throw new Error(`Expected audio blob but received ${mimeType}: ${detectErrorMessageFromText(preview)}`);
+    }
+
+    return source;
+  }
+
+  if (source instanceof ArrayBuffer || ArrayBuffer.isView(source)) {
+    const mimeType = FORMAT_TO_MIME[preferredFormat] || 'audio/webm';
+    return new Blob([source], { type: mimeType });
+  }
+
+  if (typeof source === 'string') {
+    const dataUrlMatch = source.match(/^data:([^;]+);base64,(.*)$/i);
+    if (dataUrlMatch) {
+      const mimeType = normalizeMimeType(dataUrlMatch[1] || FORMAT_TO_MIME[preferredFormat] || 'audio/webm');
+      const binary = atob(dataUrlMatch[2]);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index++) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+      return new Blob([bytes], { type: mimeType });
+    }
+
+    try {
+      const binary = atob(source.replace(/\s+/g, ''));
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index++) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+      return new Blob([bytes], { type: FORMAT_TO_MIME[preferredFormat] || 'audio/webm' });
+    } catch (error) {
+      throw new Error('Unsupported string payload for audio export.');
+    }
+  }
+
+  throw new Error(`Unsupported audio payload type: ${Object.prototype.toString.call(source)}`);
+}
+
+export function getAudioExtensionFromMimeType(mimeType = '') {
+  const normalized = normalizeMimeType(mimeType);
+  return MIME_TO_EXT[normalized] || 'webm';
+}
+
+export function downloadAudioBlob(blob, filename = 'aethervocal_speech.webm') {
+  if (!blob || !(blob instanceof Blob)) {
+    throw new Error('downloadAudioBlob expected a Blob.');
+  }
+
+  console.log('[AetherVocal] downloading audio blob', {
+    size: blob.size,
+    type: blob.type || 'unknown',
+    filename
+  });
+
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.style.display = 'none';
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
+  const anchor = document.createElement('a');
+  anchor.style.display = 'none';
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
 
   setTimeout(() => {
-    document.body.removeChild(a);
+    document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   }, 1200);
 }
 
 /**
- * Encodes 16-bit PCM Audio Samples into lossless RIFF WAV Blob.
+ * Export only real captured audio. If the browser did not capture a valid audio
+ * stream, fail fast instead of fabricating noise.
  */
-export function encodeWAV(samples, sampleRate = 44100, numChannels = 1) {
-  const buffer = new ArrayBuffer(44 + samples.length * 2);
-  const view = new DataView(buffer);
+export async function convertAndExportAudio({ chunksBlob, format = 'webm' }) {
+  const sourceBlob = await coerceToAudioBlob(chunksBlob, { preferredFormat: format });
+  const actualMimeType = normalizeMimeType(sourceBlob.type || FORMAT_TO_MIME[format] || 'audio/webm');
+  const resolvedFormat = getAudioExtensionFromMimeType(actualMimeType);
+  const desiredMimeType = FORMAT_TO_MIME[format] || actualMimeType;
 
-  /* RIFF header */
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + samples.length * 2, true);
-  writeString(view, 8, 'WAVE');
-
-  /* fmt chunk */
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numChannels * 2, true);
-  view.setUint16(32, numChannels * 2, true);
-  view.setUint16(34, 16, true);
-
-  /* data chunk */
-  writeString(view, 36, 'data');
-  view.setUint32(40, samples.length * 2, true);
-
-  let offset = 44;
-  for (let i = 0; i < samples.length; i++, offset += 2) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  if (desiredMimeType !== actualMimeType) {
+    console.warn('[AetherVocal] Requested format does not match the captured audio format. Using the recorded audio type instead.', {
+      requestedFormat: format,
+      desiredMimeType,
+      actualMimeType,
+      resolvedFormat
+    });
   }
-
-  return new Blob([view], { type: 'audio/wav' });
-}
-
-function writeString(view, offset, string) {
-  for (let i = 0; i < string.length; i++) {
-    view.setUint8(offset + i, string.charCodeAt(i));
-  }
-}
-
-/**
- * High-performance Phonetic PCM Audio Buffer Synthesizer.
- * Generates valid PCM speech waveform audio samples directly in memory.
- */
-export function generateSyntheticPCMBuffer(text, pitch = 1.0, rate = 1.0, durationSeconds = 5) {
-  const sampleRate = 22050;
-  const targetDuration = Math.max(durationSeconds, 3);
-  const numSamples = Math.ceil(sampleRate * targetDuration);
-  const samples = new Float32Array(numSamples);
-
-  const baseFreq = 150 * pitch;
-  const words = text ? text.split(/\s+/) : ['speech'];
-  const wordCount = words.length || 1;
-  const samplesPerWord = numSamples / wordCount;
-
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    const wordProgress = (i % samplesPerWord) / samplesPerWord;
-
-    // Speech volume envelope
-    const envelope = Math.sin(wordProgress * Math.PI) * (wordProgress < 0.85 ? 1.0 : 0.1);
-
-    // Formant speech frequencies (F0 fundamental + harmonics)
-    const f0 = baseFreq + Math.sin(t * 10) * 12;
-    const f1 = f0 * 2.2;
-    const f2 = f0 * 3.8;
-
-    const s0 = Math.sin(2 * Math.PI * f0 * t);
-    const s1 = 0.35 * Math.sin(2 * Math.PI * f1 * t);
-    const s2 = 0.15 * Math.sin(2 * Math.PI * f2 * t);
-
-    samples[i] = (s0 + s1 + s2) * 0.35 * envelope;
-  }
-
-  return { samples, sampleRate };
-}
-
-/**
- * Dual-Engine Multi-Format Audio Exporter
- * Guarantees non-zero file downloads every single time.
- */
-export async function convertAndExportAudio({ chunksBlob, text, pitch = 1.0, rate = 1.0, estimatedSeconds = 5, format = 'mp3' }) {
-  const ext = format === 'wav' ? 'wav' : format === 'ogg' ? 'ogg' : 'mp3';
-  const mimeType = format === 'wav' ? 'audio/wav' : format === 'ogg' ? 'audio/ogg' : 'audio/mp3';
-
-  // Engine A: Check if MediaRecorder returned valid live audio > 200 bytes
-  if (chunksBlob && chunksBlob.size > 200) {
-    const formattedBlob = new Blob([chunksBlob], { type: mimeType });
-    return {
-      blob: formattedBlob,
-      filename: `AetherVocal_Speech.${ext}`,
-      format: ext
-    };
-  }
-
-  // Engine B: Synthesize real PCM Audio Buffer
-  const { samples, sampleRate } = generateSyntheticPCMBuffer(text, pitch, rate, estimatedSeconds);
-  const wavBlob = encodeWAV(samples, sampleRate, 1);
 
   return {
-    blob: new Blob([wavBlob], { type: mimeType }),
-    filename: `AetherVocal_Speech.${ext}`,
-    format: ext
+    blob: sourceBlob,
+    filename: `AetherVocal_Speech.${resolvedFormat}`,
+    format: resolvedFormat,
+    mimeType: actualMimeType,
+    requestedFormat: format,
+    warning: desiredMimeType !== actualMimeType
+      ? `Captured audio was saved as ${resolvedFormat.toUpperCase()} because the browser recorded ${actualMimeType}.`
+      : ''
   };
 }

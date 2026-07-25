@@ -7,6 +7,7 @@ import { VoiceSelector } from './components/VoiceSelector';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { ChunkQueue } from './components/ChunkQueue';
 import { FooterPlayer } from './components/FooterPlayer';
+import { GeneratedAudioPlayer } from './components/GeneratedAudioPlayer';
 
 import { sanitizeMarkdown, strictSpeechClean } from './utils/markdownSanitizer';
 import { chunkText, calculateTextStats } from './utils/textChunker';
@@ -35,6 +36,10 @@ export default function App() {
   const [isPlayingSample, setIsPlayingSample] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [lastAudioExport, setLastAudioExport] = useState(null);
+  const [generatedAudioUrl, setGeneratedAudioUrl] = useState('');
+  const [generatedAudioError, setGeneratedAudioError] = useState('');
+  const [generatedAudioWarning, setGeneratedAudioWarning] = useState('');
+  const [generatedAudioMimeType, setGeneratedAudioMimeType] = useState('');
 
   // Refs for tracking playback loop
   const currentChunkIndexRef = useRef(-1);
@@ -63,6 +68,26 @@ export default function App() {
       setRate(selectedProfile.defaultRate || 1.0);
     }
   }, [selectedProfile]);
+
+  useEffect(() => {
+    return () => {
+      if (generatedAudioUrl) {
+        URL.revokeObjectURL(generatedAudioUrl);
+      }
+    };
+  }, [generatedAudioUrl]);
+
+  const clearGeneratedAudio = () => {
+    if (generatedAudioUrl) {
+      URL.revokeObjectURL(generatedAudioUrl);
+    }
+
+    setGeneratedAudioUrl('');
+    setGeneratedAudioError('');
+    setGeneratedAudioWarning('');
+    setGeneratedAudioMimeType('');
+    setLastAudioExport(null);
+  };
 
   // Auto-sanitize on text change if autoSanitize is checked
   const handleTextChange = (newText) => {
@@ -220,78 +245,115 @@ export default function App() {
   const handleGenerateAndDownload = async () => {
     if (!chunks || chunks.length === 0) return;
     stopAllSpeech();
+    clearGeneratedAudio();
 
-    setIsRecording(true);
     const tabRecorder = new TabAudioRecorderEngine();
-    await tabRecorder.startCapture();
 
-    isPlayingRef.current = true;
-    setIsPlaying(true);
+    try {
+      setGeneratedAudioError('');
+      setGeneratedAudioWarning('');
+      setIsRecording(true);
 
-    // Synthesize all text script chunks while recorder captures live spoken audio
-    const recordAndSynthesize = () => {
-      return new Promise((resolve) => {
-        const speakChunk = (idx) => {
-          if (!isPlayingRef.current || idx >= chunks.length) {
-            resolve();
-            return;
-          }
+      await tabRecorder.startCapture();
 
-          setActiveChunkIndex(idx);
-          const chunkStr = strictSpeechClean(chunks[idx]);
-          const utterance = new SpeechSynthesisUtterance(chunkStr);
-          const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
-          if (matchedVoice) utterance.voice = matchedVoice;
-          utterance.rate = rate;
-          utterance.pitch = pitch;
+      isPlayingRef.current = true;
+      setIsPlaying(true);
 
-          utterance.onend = () => {
-            if (idx + 1 < chunks.length) {
-              speakChunk(idx + 1);
-            } else {
+      // Synthesize all text script chunks while recorder captures live spoken audio
+      const recordAndSynthesize = () => {
+        return new Promise((resolve) => {
+          const speakChunk = (idx) => {
+            if (!isPlayingRef.current || idx >= chunks.length) {
               resolve();
+              return;
             }
+
+            setActiveChunkIndex(idx);
+            const chunkStr = strictSpeechClean(chunks[idx]);
+            const utterance = new SpeechSynthesisUtterance(chunkStr);
+            const matchedVoice = findMatchingSystemVoice(systemVoices, selectedProfile);
+            if (matchedVoice) utterance.voice = matchedVoice;
+            utterance.lang = selectedProfile.langGroup === 'hi' ? 'hi-IN' : 'en-US';
+            utterance.rate = rate;
+            utterance.pitch = pitch;
+
+            console.log('[AetherVocal] speaking chunk', {
+              chunkIndex: idx,
+              voice: matchedVoice?.name || 'browser-default',
+              lang: utterance.lang,
+              rate: utterance.rate,
+              pitch: utterance.pitch
+            });
+
+            utterance.onend = () => {
+              if (idx + 1 < chunks.length) {
+                speakChunk(idx + 1);
+              } else {
+                resolve();
+              }
+            };
+
+            utterance.onerror = (event) => {
+              console.error('[AetherVocal] speech synthesis chunk error', event);
+              if (idx + 1 < chunks.length) {
+                speakChunk(idx + 1);
+              } else {
+                resolve();
+              }
+            };
+
+            synthRef.current.speak(utterance);
           };
 
-          utterance.onerror = () => {
-            if (idx + 1 < chunks.length) {
-              speakChunk(idx + 1);
-            } else {
-              resolve();
-            }
-          };
+          speakChunk(0);
+        });
+      };
 
-          synthRef.current.speak(utterance);
-        };
+      await recordAndSynthesize();
 
-        speakChunk(0);
+      // Stop tab audio capture & retrieve genuine speech audio blob
+      const liveRecordedBlob = await tabRecorder.stopCapture();
+
+      if (!liveRecordedBlob || liveRecordedBlob.size === 0) {
+        throw new Error('No valid audio was captured. Check tab/system audio permissions and try again.');
+      }
+
+      const result = await convertAndExportAudio({
+        chunksBlob: liveRecordedBlob,
+        format: outputFormat
       });
-    };
 
-    await recordAndSynthesize();
+      if (result && result.blob) {
+        const filename = result.filename || `AetherVocal_${selectedProfile.id}_${Date.now()}.${result.format}`;
+        const objectUrl = URL.createObjectURL(result.blob);
 
-    // Stop tab audio capture & retrieve genuine speech audio blob
-    const liveRecordedBlob = await tabRecorder.stopCapture();
+        console.log('[AetherVocal] export complete', {
+          filename,
+          mimeType: result.mimeType || result.blob.type,
+          format: result.format,
+          size: result.blob.size,
+          warning: result.warning
+        });
 
-    const result = await convertAndExportAudio({
-      chunksBlob: liveRecordedBlob,
-      text: text,
-      pitch: pitch,
-      rate: rate,
-      estimatedSeconds: stats.estimatedSeconds,
-      format: outputFormat
-    });
-
-    if (result && result.blob) {
-      setLastAudioExport(result);
-      const filename = `AetherVocal_${selectedProfile.id}_${Date.now()}.${result.format}`;
-      downloadAudioBlob(result.blob, filename);
+        setLastAudioExport({
+          ...result,
+          filename,
+          objectUrl
+        });
+        setGeneratedAudioUrl(objectUrl);
+        setGeneratedAudioWarning(result.warning || '');
+        setGeneratedAudioMimeType(result.mimeType || result.blob.type || '');
+        downloadAudioBlob(result.blob, filename);
+      }
+    } catch (error) {
+      console.error('[AetherVocal] audio generation failed', error);
+      setGeneratedAudioError(error?.message || 'Audio generation failed.');
+    } finally {
+      setIsRecording(false);
+      setIsPlaying(false);
+      isPlayingRef.current = false;
+      setActiveChunkIndex(-1);
     }
-
-    setIsRecording(false);
-    setIsPlaying(false);
-    isPlayingRef.current = false;
-    setActiveChunkIndex(-1);
   };
 
   const handleDownloadLastAudio = () => {
@@ -366,6 +428,17 @@ export default function App() {
               activeChunkIndex={activeChunkIndex}
               isPlaying={isPlaying}
               onPlaySingleChunk={handlePlaySingleChunk}
+            />
+
+            <GeneratedAudioPlayer
+              audioUrl={generatedAudioUrl}
+              audioBlob={lastAudioExport?.blob || null}
+              filename={lastAudioExport?.filename || ''}
+              mimeType={generatedAudioMimeType}
+              warning={generatedAudioWarning}
+              error={generatedAudioError}
+              onDownload={handleDownloadLastAudio}
+              onClear={clearGeneratedAudio}
             />
           </div>
         </div>

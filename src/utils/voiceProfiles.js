@@ -176,39 +176,56 @@ export function findMatchingSystemVoice(systemVoices, profile) {
   const targetGenderLower = (profile.gender || '').toLowerCase();
   const targetLangGroup = profile.langGroup;
 
-  // 1. First priority: match exact profile keywords AND gender
-  for (const matchName of profile.matchingNames) {
-    const found = systemVoices.find(v => {
-      const vName = (v.name || '').toLowerCase();
-      const vLang = (v.lang || '').toLowerCase();
-      const langMatches = targetLangGroup === 'hi' ? (vLang.startsWith('hi') || vName.includes('hindi')) : vLang.startsWith('en');
-      return langMatches && vName.includes(matchName);
+  const scoredCandidates = systemVoices.map((voice, index) => {
+    const vName = (voice.name || '').toLowerCase();
+    const vLang = (voice.lang || '').toLowerCase();
+    const langMatches = targetLangGroup === 'hi'
+      ? (vLang.startsWith('hi') || vName.includes('hindi'))
+      : targetLangGroup === 'en'
+        ? vLang.startsWith('en')
+        : true;
+
+    const isMale = vName.includes('male') || vName.includes('man') || vName.includes('hemant') || vName.includes('david') || vName.includes('guy') || vName.includes('rishi');
+    const isFemale = vName.includes('female') || vName.includes('woman') || vName.includes('zira') || vName.includes('aria') || vName.includes('swara') || vName.includes('neerja') || vName.includes('priya');
+
+    let score = 0;
+    if (langMatches) score += 10;
+    if (targetGenderLower === 'male' && isMale) score += 8;
+    if (targetGenderLower === 'female' && isFemale) score += 8;
+    if (voice.localService) score += 2;
+    if (vName.includes('google') || vName.includes('natural') || vName.includes('neural')) score += 1;
+
+    for (const matchName of profile.matchingNames || []) {
+      if (vName.includes(matchName.toLowerCase())) {
+        score += 12;
+        break;
+      }
+    }
+
+    return { voice, score, index };
+  });
+
+  const sortedCandidates = scoredCandidates
+    .filter(item => item.score > 0)
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+
+  if (sortedCandidates.length > 0) {
+    console.log('[AetherVocal] resolved system voice', {
+      profile: profile.name,
+      selectedVoice: sortedCandidates[0].voice.name,
+      language: sortedCandidates[0].voice.lang,
+      score: sortedCandidates[0].score
     });
-    if (found) return found;
+    return sortedCandidates[0].voice;
   }
 
-  // 2. Gender specific fallback search in system voices
-  const genderMatch = systemVoices.find(v => {
-    const vName = (v.name || '').toLowerCase();
-    const vLang = (v.lang || '').toLowerCase();
-    const langMatches = targetLangGroup === 'hi' ? (vLang.startsWith('hi') || vName.includes('hindi')) : vLang.startsWith('en');
-    const isMale = vName.includes('male') || vName.includes('man') || vName.includes('hemant') || vName.includes('david') || vName.includes('guy');
-    const isFemale = vName.includes('female') || vName.includes('woman') || vName.includes('zira') || vName.includes('aria') || vName.includes('swara');
-
-    if (targetGenderLower === 'male') return langMatches && isMale;
-    if (targetGenderLower === 'female') return langMatches && isFemale;
-    return langMatches;
+  const languageFallback = systemVoices.find(voice => {
+    const vName = (voice.name || '').toLowerCase();
+    const vLang = (voice.lang || '').toLowerCase();
+    if (profile.langGroup === 'hi') return vLang.startsWith('hi') || vName.includes('hindi');
+    if (profile.langGroup === 'en') return vLang.startsWith('en');
+    return true;
   });
 
-  if (genderMatch) return genderMatch;
-
-  // 3. Language group match fallback
-  const langMatch = systemVoices.find(v => {
-    const lang = (v.lang || '').toLowerCase();
-    if (profile.langGroup === 'hi') return lang.startsWith('hi') || (v.name || '').toLowerCase().includes('hindi');
-    if (profile.langGroup === 'en') return lang.startsWith('en');
-    return false;
-  });
-
-  return langMatch || systemVoices[0];
+  return languageFallback || systemVoices[0];
 }
