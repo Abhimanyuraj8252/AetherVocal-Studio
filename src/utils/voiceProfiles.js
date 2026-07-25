@@ -8,40 +8,43 @@ export const PREMIUM_VOICE_PROFILES = [
   // 🇮🇳 HINDI FEMALE VOICES
   {
     id: 'hi_female_swara',
-    name: 'Hindi Female — Swara (कहानीकार)',
+    name: 'Hindi Female — Swara (Storyteller)',
     langGroup: 'hi',
     langLabel: 'Hindi (हिंदी)',
     gender: 'Female',
     avatar: '👩‍💼',
+    voiceRole: 'story',
     style: 'Warm & Expressive Storyteller',
-    sampleText: 'नमस्ते! मैं स्वरा हूँ। मेरी आवाज़ कहानियों और पॉडकास्ट के लिए बहुत सुरीली और सहज है।',
-    matchingNames: ['swara', 'google हिन्दी', 'google hindi', 'kalpana', 'veena', 'female'],
+    sampleText: 'नमस्ते! मैं स्वरा हूँ। मेरी आवाज़ हिंदी कहानियों, ऑडियोबुक और भावनात्मक narration के लिए बहुत सहज है।',
+    matchingNames: ['swara', 'google हिन्दी', 'google hindi', 'kalpana', 'veena', 'female', 'story', 'narrator'],
     defaultPitch: 1.1,
     defaultRate: 0.95
   },
   {
     id: 'hi_female_neerja',
-    name: 'Hindi Female — Neerja (समाचार वाचक)',
+    name: 'Hindi Female — Neerja (News Anchor)',
     langGroup: 'hi',
     langLabel: 'Hindi (हिंदी)',
     gender: 'Female',
     avatar: '👩‍💻',
+    voiceRole: 'news',
     style: 'Professional & Clear News Anchor',
-    sampleText: 'मुख्य समाचारों में आपका स्वागत है। आज की प्रमुख खबरें और ताजा अपडेट्स ध्यान से सुनें।',
-    matchingNames: ['neerja', 'shruti', 'pooja', 'kavya', 'female'],
+    sampleText: 'मुख्य समाचारों में आपका स्वागत है। आज की प्रमुख खबरें और ताजा अपडेट्स स्पष्ट, भरोसेमंद और पेशेवर अंदाज़ में सुनिए।',
+    matchingNames: ['neerja', 'shruti', 'pooja', 'kavya', 'female', 'news', 'anchor', 'reporter'],
     defaultPitch: 1.15,
     defaultRate: 1.0
   },
   {
     id: 'hi_female_priya',
-    name: 'Hindi Female — Priya (मधुर & शांत)',
+    name: 'Hindi Female — Priya (Tech Host)',
     langGroup: 'hi',
     langLabel: 'Hindi (हिंदी)',
     gender: 'Female',
     avatar: '👩‍🏫',
+    voiceRole: 'tech',
     style: 'Calm, Soft & Educational',
-    sampleText: 'नमस्ते! मैं प्रिया हूँ। मैं शिक्षात्मक वीडियो और ट्यूटोरियल के लिए सबसे बेहतरीन हूँ।',
-    matchingNames: ['priya', 'ananya', 'aditi', 'female'],
+    sampleText: 'नमस्ते! मैं प्रिया हूँ। मैं टेक explainers, tutorials, product walkthroughs और educational content के लिए उपयुक्त हूँ।',
+    matchingNames: ['priya', 'ananya', 'aditi', 'female', 'tech', 'tutorial', 'guide'],
     defaultPitch: 1.2,
     defaultRate: 0.9
   },
@@ -49,40 +52,43 @@ export const PREMIUM_VOICE_PROFILES = [
   // 🇮🇳 HINDI MALE VOICES
   {
     id: 'hi_male_hemant',
-    name: 'Hindi Male — Hemant (गंभीर सूत्रधार)',
+    name: 'Hindi Male — Hemant (Storyteller)',
     langGroup: 'hi',
     langLabel: 'Hindi (हिंदी)',
     gender: 'Male',
     avatar: '👨‍💼',
+    voiceRole: 'story',
     style: 'Deep, Rich & Commandive Narrator',
-    sampleText: 'नमस्कार! मैं हेमंत हूँ। मेरी गंभीर और प्रभावशाली आवाज़ डॉक्यूमेन्ट्री और किताबों के लिए बेस्ट है।',
-    matchingNames: ['hemant', 'rishi', 'arjun', 'kabir', 'male', 'guy', 'man'],
+    sampleText: 'नमस्कार! मैं हेमंत हूँ। मेरी गहरी, स्पष्ट और प्रभावशाली आवाज़ हिंदी कहानियों, ऑडियोबुक और documentary narration के लिए उपयुक्त है।',
+    matchingNames: ['hemant', 'rishi', 'arjun', 'kabir', 'male', 'guy', 'man', 'story', 'narrator'],
     defaultPitch: 0.82,
     defaultRate: 0.95
   },
   {
     id: 'hi_male_madhur',
-    name: 'Hindi Male — Madhur (ऊर्जावान)',
+    name: 'Hindi Male — Madhur (News Anchor)',
     langGroup: 'hi',
     langLabel: 'Hindi (हिंदी)',
     gender: 'Male',
     avatar: '👨‍🎤',
-    style: 'Energetic & Modern Tech Host',
-    sampleText: 'हेलो दोस्तों! मैं मधुर हूँ। आज हम टेक और नए गैजेट्स के बारे में विस्तार से जानेंगे।',
-    matchingNames: ['madhur', 'amit', 'ravi', 'male', 'guy'],
+    voiceRole: 'news',
+    style: 'Energetic & Modern News Presenter',
+    sampleText: 'नमस्कार! मैं मधुर हूँ। आज की प्रमुख खबरें, ताज़ा अपडेट्स और important headlines अब सुनिए साफ़, तेज़ और भरोसेमंद अंदाज़ में।',
+    matchingNames: ['madhur', 'amit', 'ravi', 'male', 'guy', 'news', 'anchor', 'reporter'],
     defaultPitch: 0.88,
     defaultRate: 1.05
   },
   {
     id: 'hi_male_kabir',
-    name: 'Hindi Male — Kabir (साहित्यिक)',
+    name: 'Hindi Male — Kabir (Tech Host)',
     langGroup: 'hi',
     langLabel: 'Hindi (हिंदी)',
     gender: 'Male',
     avatar: '👨‍🎨',
+    voiceRole: 'tech',
     style: 'Poetic & Cinematic Voice',
-    sampleText: 'जिंदगी एक खूबसूरत सफर है, जहाँ हर मोड़ पर एक नई कहानी इंतज़ार करती है।',
-    matchingNames: ['kabir', 'arjun', 'rishi', 'male'],
+    sampleText: 'आज हम एक आधुनिक टेक topic को आसान हिंदी में समझेंगे, step by step, ताकि हर listener को clear and practical explanation मिले।',
+    matchingNames: ['kabir', 'arjun', 'rishi', 'male', 'tech', 'tutorial', 'guide'],
     defaultPitch: 0.85,
     defaultRate: 0.9
   },
@@ -90,40 +96,43 @@ export const PREMIUM_VOICE_PROFILES = [
   // 🇬🇧 ENGLISH FEMALE VOICES
   {
     id: 'en_female_aria',
-    name: 'English Female — Aria (Natural Studio)',
+    name: 'English Female — Aria (Storyteller)',
     langGroup: 'en',
     langLabel: 'English (US)',
     gender: 'Female',
     avatar: '🎙️',
+    voiceRole: 'story',
     style: 'Smooth, Natural & Friendly Studio Voice',
-    sampleText: 'Hello there! I am Aria. I deliver crystal clear speech for podcasts, audiobooks, and courses.',
-    matchingNames: ['aria', 'zira', 'catherine', 'susan', 'samantha', 'jenny', 'female'],
+    sampleText: 'Hello there! I am Aria. I deliver warm storytelling for audiobooks, podcasts, and immersive scripts.',
+    matchingNames: ['aria', 'zira', 'catherine', 'susan', 'samantha', 'jenny', 'female', 'story', 'narrator'],
     defaultPitch: 1.1,
     defaultRate: 1.0
   },
   {
     id: 'en_female_zira',
-    name: 'English Female — Zira (Executive)',
+    name: 'English Female — Zira (News Anchor)',
     langGroup: 'en',
     langLabel: 'English (US)',
     gender: 'Female',
     avatar: '💼',
+    voiceRole: 'news',
     style: 'Articulate & Crisp Presentation Voice',
-    sampleText: 'Welcome to our product presentation. Let us explore the groundbreaking features built for you.',
-    matchingNames: ['zira', 'victoria', 'karen', 'fiona', 'hazel', 'female'],
+    sampleText: 'Welcome to our news update. Here are today’s headlines, delivered with clarity, pace, and authority.',
+    matchingNames: ['zira', 'victoria', 'karen', 'fiona', 'hazel', 'female', 'news', 'anchor', 'reporter'],
     defaultPitch: 1.15,
     defaultRate: 1.05
   },
   {
     id: 'en_female_sonia',
-    name: 'English Female — Sonia (Indian Accent)',
+    name: 'English Female — Sonia (Tech Host)',
     langGroup: 'en',
     langLabel: 'English (India)',
     gender: 'Female',
     avatar: '🇮🇳',
+    voiceRole: 'tech',
     style: 'Warm Indian Accent Accentuated Speech',
-    sampleText: 'Hello! I am Sonia. I provide clear Indian-accented English speech for tutorials and explanations.',
-    matchingNames: ['sonia', 'veena', 'heera', 'female'],
+    sampleText: 'Hello! I am Sonia. I provide clear Indian-accented English speech for tutorials, product walkthroughs, and explainers.',
+    matchingNames: ['sonia', 'veena', 'heera', 'female', 'tech', 'tutorial', 'guide'],
     defaultPitch: 1.1,
     defaultRate: 0.95
   },
@@ -131,40 +140,43 @@ export const PREMIUM_VOICE_PROFILES = [
   // 🇬🇧 ENGLISH MALE VOICES
   {
     id: 'en_male_guy',
-    name: 'English Male — Guy (Deep Cinematic)',
+    name: 'English Male — Guy (Storyteller)',
     langGroup: 'en',
     langLabel: 'English (US)',
     gender: 'Male',
     avatar: '📻',
+    voiceRole: 'story',
     style: 'Deep, Resonant & Authority Voice',
-    sampleText: 'In a world of constant evolution, technology bridges the gap between imagination and reality.',
-    matchingNames: ['guy', 'david', 'mark', 'george', 'richard', 'alex', 'male', 'man'],
+    sampleText: 'In a world of constant evolution, this narrator delivers cinematic storytelling with depth and presence.',
+    matchingNames: ['guy', 'david', 'mark', 'george', 'richard', 'alex', 'male', 'man', 'story', 'narrator'],
     defaultPitch: 0.8,
     defaultRate: 0.95
   },
   {
     id: 'en_male_david',
-    name: 'English Male — David (Tech Narrator)',
+    name: 'English Male — David (News Anchor)',
     langGroup: 'en',
     langLabel: 'English (US)',
     gender: 'Male',
     avatar: '💻',
+    voiceRole: 'news',
     style: 'Clean, Modern & Confident Voice',
-    sampleText: 'Welcome to the future of offline text-to-speech synthesis with zero character limits.',
-    matchingNames: ['david', 'james', 'daniel', 'male', 'man'],
+    sampleText: 'Welcome to the news desk. Today’s headlines are presented clearly, professionally, and with confident pacing.',
+    matchingNames: ['david', 'james', 'daniel', 'male', 'man', 'news', 'anchor', 'reporter'],
     defaultPitch: 0.85,
     defaultRate: 1.0
   },
   {
     id: 'en_male_rishi',
-    name: 'English Male — Rishi (Indian Accent)',
+    name: 'English Male — Rishi (Tech Host)',
     langGroup: 'en',
     langLabel: 'English (India)',
     gender: 'Male',
     avatar: '👨‍💼',
+    voiceRole: 'tech',
     style: 'Professional Indian English Voice',
-    sampleText: 'Good day! I am Rishi. I am tailored for delivering technical tutorials and Indian English content.',
-    matchingNames: ['rishi', 'prabhat', 'male', 'man'],
+    sampleText: 'Good day! I am Rishi. I’m tailored for technical tutorials, product walkthroughs, and practical English content.',
+    matchingNames: ['rishi', 'prabhat', 'male', 'man', 'tech', 'tutorial', 'guide'],
     defaultPitch: 0.82,
     defaultRate: 0.95
   }
@@ -175,21 +187,39 @@ export function findMatchingSystemVoice(systemVoices, profile) {
 
   const targetGenderLower = (profile.gender || '').toLowerCase();
   const targetLangGroup = profile.langGroup;
+  const profileOrder = {
+    hi_female_swara: 0,
+    hi_female_neerja: 1,
+    hi_female_priya: 2,
+    hi_male_hemant: 0,
+    hi_male_madhur: 1,
+    hi_male_kabir: 2,
+    en_female_aria: 0,
+    en_female_zira: 1,
+    en_female_sonia: 2,
+    en_male_guy: 0,
+    en_male_david: 1,
+    en_male_rishi: 2
+  };
+
+  const exactLanguageTags = targetLangGroup === 'hi'
+    ? ['hi', 'hi-in', 'hindi']
+    : targetLangGroup === 'en'
+      ? ['en', 'en-us', 'en-gb', 'en-in']
+      : [];
 
   const scoredCandidates = systemVoices.map((voice, index) => {
     const vName = (voice.name || '').toLowerCase();
     const vLang = (voice.lang || '').toLowerCase();
-    const langMatches = targetLangGroup === 'hi'
-      ? (vLang.startsWith('hi') || vName.includes('hindi'))
-      : targetLangGroup === 'en'
-        ? vLang.startsWith('en')
-        : true;
+    const langMatches = exactLanguageTags.length === 0
+      ? true
+      : exactLanguageTags.some(tag => vLang.startsWith(tag) || vName.includes(tag) || (tag === 'hindi' && vName.includes('hindi')));
 
     const isMale = vName.includes('male') || vName.includes('man') || vName.includes('hemant') || vName.includes('david') || vName.includes('guy') || vName.includes('rishi');
     const isFemale = vName.includes('female') || vName.includes('woman') || vName.includes('zira') || vName.includes('aria') || vName.includes('swara') || vName.includes('neerja') || vName.includes('priya');
 
     let score = 0;
-    if (langMatches) score += 10;
+    if (langMatches) score += 12;
     if (targetGenderLower === 'male' && isMale) score += 8;
     if (targetGenderLower === 'female' && isFemale) score += 8;
     if (voice.localService) score += 2;
@@ -219,7 +249,7 @@ export function findMatchingSystemVoice(systemVoices, profile) {
     return sortedCandidates[0].voice;
   }
 
-  const languageFallback = systemVoices.find(voice => {
+  const languageCandidates = systemVoices.filter(voice => {
     const vName = (voice.name || '').toLowerCase();
     const vLang = (voice.lang || '').toLowerCase();
     if (profile.langGroup === 'hi') return vLang.startsWith('hi') || vName.includes('hindi');
@@ -227,5 +257,18 @@ export function findMatchingSystemVoice(systemVoices, profile) {
     return true;
   });
 
-  return languageFallback || systemVoices[0];
+  if (languageCandidates.length > 0) {
+    const preferredIndex = profileOrder[profile.id] ?? 0;
+    const fallbackVoice = languageCandidates[preferredIndex % languageCandidates.length];
+    console.log('[AetherVocal] fallback system voice', {
+      profile: profile.name,
+      selectedVoice: fallbackVoice?.name,
+      language: fallbackVoice?.lang,
+      bucketIndex: preferredIndex,
+      candidateCount: languageCandidates.length
+    });
+    return fallbackVoice;
+  }
+
+  return systemVoices[0];
 }
