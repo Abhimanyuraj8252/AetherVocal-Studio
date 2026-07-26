@@ -14,7 +14,10 @@ export function FooterPlayer({
   onDismissError,
   selectedFormat,
   setSelectedFormat,
-  stats
+  stats,
+  isComplete,
+  nextChunkIndex,
+  totalChunks
 }) {
   return (
     <footer className="sticky-player-bar">
@@ -93,8 +96,8 @@ export function FooterPlayer({
           <button
             type="button"
             onClick={onDownload}
-            className="btn-player btn-download-gradient"
-            disabled={isGenerating}
+            className={`btn-player ${isComplete ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'btn-download-gradient'}`}
+            disabled={isGenerating || (isComplete && totalChunks > 0)}
           >
             {isGenerating ? (
               <>
@@ -104,13 +107,19 @@ export function FooterPlayer({
                     ? (generationProgress.total > 1 
                         ? `Chunk ${generationProgress.current}/${generationProgress.total} (${generationProgress.percent}%)` 
                         : 'Generating...')
-                    : 'Generating Audio...'}
+                    : 'Generating Block...'}
                 </span>
               </>
             ) : (
               <>
                 <Download className="w-4 h-4 flex-shrink-0" />
-                <span>Save Audio</span>
+                <span>
+                  {isComplete 
+                    ? 'All Parts Generated (Select in History to Combine)' 
+                    : nextChunkIndex > 0 
+                      ? `Generate Next Part (${nextChunkIndex + 1} to ${Math.min(nextChunkIndex + 20, totalChunks)})` 
+                      : 'Generate Audio (Part 1)'}
+                </span>
               </>
             )}
           </button>

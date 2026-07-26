@@ -244,21 +244,21 @@ body {
 .app-layout { display: flex; flex-direction: column; min-height: 100vh; width: 100%; overflow-x: hidden; }
 
 .main-content {
-  max-width: 1400px;
+  max-width: 1536px;
   width: 100%;
   margin: 0 auto;
-  padding: 0.55rem;
+  padding: 1rem;
   flex: 1;
 }
 
 @media (min-width: 768px) {
-  .main-content { padding: 1.25rem; }
+  .main-content { padding: 2rem; }
 }
 
-.grid-container { display: grid; grid-template-columns: 1fr; gap: 0.85rem; width: 100%; }
+.grid-container { display: grid; grid-template-columns: 1fr; gap: 1.5rem; width: 100%; }
 
 @media (min-width: 1024px) {
-  .grid-container { grid-template-columns: 1.2fr 0.8fr; }
+  .grid-container { grid-template-columns: 14fr 10fr; gap: 2rem; }
 }
 
 /* Header */
@@ -422,17 +422,20 @@ body {
 /* Cards */
 .card {
   background: var(--bg-card);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 0.75rem;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.06);
-  transition: border-color 0.2s ease;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
 }
 
-.card:hover { border-color: var(--border-highlight); }
+.card:hover { 
+  border-color: rgba(99, 102, 241, 0.3); 
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba(99, 102, 241, 0.1);
+}
 
 .card-header {
   display: flex;
@@ -578,6 +581,118 @@ body {
 .audio-history-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border-color);
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.history-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.history-header-title {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.history-header-sub {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+.history-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-combine-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-combine-download:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
+}
+
+.btn-combine-download:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-icon-action {
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-icon-action:hover {
+  color: var(--text-main);
+  border-color: var(--primary-accent);
+  background: var(--primary-glow);
+}
+
+.btn-icon-danger:hover {
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.4);
+  background: rgba(244, 63, 94, 0.15);
+}
+
+.history-checkbox-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  transition: color 0.15s ease;
+}
+
+.history-checkbox-btn.selected {
+  color: var(--primary-accent);
+}
+
+.history-item-selected {
+  background: rgba(99, 102, 241, 0.12) !important;
+  border-color: rgba(99, 102, 241, 0.4) !important;
 }
 
 .history-list {

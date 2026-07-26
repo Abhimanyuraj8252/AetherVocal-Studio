@@ -82,15 +82,22 @@ export class CloudSpeechSynthesizer {
    * @returns {Promise<Blob>} Combined 16-bit PCM WAV Audio Blob
    */
   static async synthesize(text, options = {}) {
-    const { onProgress } = options;
+    const { onProgress, startIndex = 0, maxChunks = 20 } = options;
     const isHindi = /[\u0900-\u097F]/.test(text);
     const lang = options.lang || (isHindi ? 'hi' : 'en');
 
     // 1. SMART TEXT CHUNKER
-    const chunks = this.smartChunkText(text, 180);
+    const allChunks = this.smartChunkText(text, 180);
 
-    if (chunks.length === 0) {
+    if (allChunks.length === 0) {
       throw new Error("Text input is empty or contains no valid characters.");
+    }
+
+    const endIndex = Math.min(startIndex + maxChunks, allChunks.length);
+    const chunks = allChunks.slice(startIndex, endIndex);
+    
+    if (chunks.length === 0) {
+      return { wavBlob: null, endIndex: allChunks.length, isComplete: true };
     }
 
     if (onProgress) {
@@ -98,7 +105,7 @@ export class CloudSpeechSynthesizer {
         current: 0,
         total: chunks.length,
         percent: 0,
-        statusText: `Preparing to process ${chunks.length} audio chunks...`
+        statusText: `Preparing chunks ${startIndex + 1} to ${endIndex}...`
       });
     }
 
@@ -134,9 +141,9 @@ export class CloudSpeechSynthesizer {
         console.warn(`Warning: Failed to process chunk ${i + 1} ("${chunk.slice(0, 20)}..."):`, err);
       }
 
-      // Small delay between requests to avoid rate limits
+      // Add a healthy delay between requests to avoid Google/Lingva 429 Too Many Requests
       if (i < chunks.length - 1) {
-        await new Promise(res => setTimeout(res, 60));
+        await new Promise(res => setTimeout(res, 1200));
       }
     }
 
@@ -177,36 +184,90 @@ export class CloudSpeechSynthesizer {
       // Ignore cleanup error
     }
 
+    return { 
+      wavBlob, 
+      endIndex, 
+      isComplete: endIndex >= allChunks.length 
+    };
+  }
+
+  /**
+   * Combines multiple saved WAV blobs into a single continuous WAV blob
+   * @param {Blob[]} blobs - Array of WAV blobs from IndexedDB
+   * @param {Function} [onProgress] - Optional progress callback
+   */
+  static async combineSavedBlobs(blobs, onProgress) {
+    if (!blobs || blobs.length === 0) throw new Error("No blobs to combine");
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContextClass();
+    const audioBuffers = [];
+
+    for (let i = 0; i < blobs.length; i++) {
+      if (onProgress) {
+        onProgress({ statusText: `Decoding audio block ${i + 1} of ${blobs.length}...` });
+      }
+      const arrayBuffer = await blobs[i].arrayBuffer();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      audioBuffers.push(audioBuffer);
+    }
+
+    if (onProgress) {
+      onProgress({ statusText: "Stitching blocks gaplessly..." });
+    }
+    
+    const combinedBuffer = this.stitchAudioBuffers(audioBuffers, audioCtx);
+    
+    if (onProgress) {
+      onProgress({ statusText: "Exporting final combined WAV file..." });
+    }
+    
+    const wavBlob = this.audioBufferToWavBlob(combinedBuffer);
+
+    try {
+      if (audioCtx.state !== 'closed') audioCtx.close();
+    } catch(e) {}
+
     return wavBlob;
   }
 
   /**
    * Fetches audio for a single chunk and decodes into AudioBuffer
    */
-  static async fetchAndDecodeChunk(chunk, lang, audioCtx) {
-    const primaryUrl = `https://lingva.ml/api/v1/audio/${lang}/${encodeURIComponent(chunk)}`;
-    
-    try {
-      const response = await fetch(primaryUrl);
-      if (!response.ok) throw new Error(`Lingva returned status ${response.status}`);
-      const data = await response.json();
+  static async fetchAndDecodeChunk(chunk, lang, audioCtx, retries = 2) {
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const primaryUrl = `https://lingva.ml/api/v1/audio/${lang}/${encodeURIComponent(chunk)}`;
+        const response = await fetch(primaryUrl);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.audio && Array.isArray(data.audio)) {
+            const uint8Array = new Uint8Array(data.audio);
+            const arrayBuffer = uint8Array.buffer;
+            return await audioCtx.decodeAudioData(arrayBuffer);
+          }
+        }
 
-      if (data && data.audio && Array.isArray(data.audio)) {
-        const uint8Array = new Uint8Array(data.audio);
-        const arrayBuffer = uint8Array.buffer;
-        return await audioCtx.decodeAudioData(arrayBuffer);
+        // Fallback: direct Google Translate TTS endpoint
+        const fallbackUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&q=${encodeURIComponent(chunk)}&tl=${lang}`;
+        const res = await fetch(fallbackUrl);
+        if (res.ok) {
+          const arrayBuffer = await res.arrayBuffer();
+          return await audioCtx.decodeAudioData(arrayBuffer);
+        }
+
+        throw new Error(`Both APIs failed. Lingva: ${response.status}, Google: ${res.status}`);
+      } catch (err) {
+        lastErr = err;
+        console.warn(`Chunk fetch attempt ${attempt + 1} failed, retrying...`, err);
+        if (attempt < retries) {
+          await new Promise(res => setTimeout(res, 1500 * (attempt + 1))); // Exponential backoff
+        }
       }
-    } catch (err) {
-      console.warn("Primary Lingva TTS fetch failed, attempting fallback:", err);
-      // Fallback: direct Google Translate TTS endpoint
-      const fallbackUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&q=${encodeURIComponent(chunk)}&tl=${lang}`;
-      const res = await fetch(fallbackUrl);
-      if (!res.ok) throw new Error(`Fallback TTS returned status ${res.status}`);
-      const arrayBuffer = await res.arrayBuffer();
-      return await audioCtx.decodeAudioData(arrayBuffer);
     }
-    
-    throw new Error("Invalid audio response");
+    throw new Error(`Failed to fetch audio after ${retries} retries: ` + lastErr.message);
   }
 
   /**
