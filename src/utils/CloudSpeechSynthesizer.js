@@ -78,11 +78,13 @@ export class CloudSpeechSynthesizer {
    * @param {string} text - Input text script
    * @param {Object} options - Synthesizer options
    * @param {string} [options.lang='hi'] - Target language code ('hi' or 'en')
+   * @param {number} [options.pitch=1.0] - Pitch multiplier (e.g. 0.85 for male)
+   * @param {number} [options.rate=1.0] - Speed multiplier
    * @param {Function} [options.onProgress] - Callback function: onProgress({ current, total, percent, statusText })
    * @returns {Promise<Blob>} Combined 16-bit PCM WAV Audio Blob
    */
   static async synthesize(text, options = {}) {
-    const { onProgress, startIndex = 0, maxChunks = 20 } = options;
+    const { onProgress, startIndex = 0, maxChunks = 20, pitch = 1.0, rate = 1.0 } = options;
     const isHindi = /[\u0900-\u097F]/.test(text);
     const lang = options.lang || (isHindi ? 'hi' : 'en');
 
@@ -161,7 +163,20 @@ export class CloudSpeechSynthesizer {
     }
 
     // 3. WEB AUDIO BUFFER STITCHER
-    const combinedAudioBuffer = this.stitchAudioBuffers(decodedAudioBuffers, audioCtx);
+    let combinedAudioBuffer = this.stitchAudioBuffers(decodedAudioBuffers, audioCtx);
+
+    // Apply Acoustic Profile (Pitch for Male/Female, Speed)
+    if (pitch !== 1.0 || rate !== 1.0) {
+      if (onProgress) {
+        onProgress({
+          current: chunks.length,
+          total: chunks.length,
+          percent: 99,
+          statusText: `Applying acoustic profile (Pitch: ${pitch}, Rate: ${rate})...`
+        });
+      }
+      combinedAudioBuffer = await this.applyAcousticProfile(combinedAudioBuffer, pitch, rate);
+    }
 
     if (onProgress) {
       onProgress({
@@ -302,6 +317,49 @@ export class CloudSpeechSynthesizer {
     }
 
     return combinedBuffer;
+  }
+
+  /**
+   * Applies Pitch and Rate via OfflineAudioContext to convert Female to Male etc.
+   */
+  static async applyAcousticProfile(audioBuffer, pitch = 1.0, rate = 1.0) {
+    if (pitch === 1.0 && rate === 1.0) return audioBuffer;
+
+    const playbackRate = pitch * rate;
+    const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    
+    // Create offline context with the new duration
+    const newDuration = audioBuffer.duration / playbackRate;
+    const offlineCtx = new OfflineCtx(
+      audioBuffer.numberOfChannels,
+      Math.ceil(audioBuffer.sampleRate * newDuration),
+      audioBuffer.sampleRate
+    );
+
+    const source = offlineCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.playbackRate.value = playbackRate;
+    
+    // Add EQ processing based on pitch to simulate different voice styles
+    // If pitch is low (Male), boost bass slightly for "Documentary/Dramatic" feel
+    const lowShelf = offlineCtx.createBiquadFilter();
+    lowShelf.type = 'lowshelf';
+    lowShelf.frequency.value = 200;
+    
+    if (pitch < 0.95) {
+      lowShelf.gain.value = 5; // Boost bass for male voices
+    } else if (pitch > 1.05) {
+      lowShelf.gain.value = -2; // Reduce bass for higher/female voices
+    } else {
+      lowShelf.gain.value = 0;
+    }
+
+    source.connect(lowShelf);
+    lowShelf.connect(offlineCtx.destination);
+    
+    source.start(0);
+
+    return await offlineCtx.startRendering();
   }
 
   /**

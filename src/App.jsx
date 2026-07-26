@@ -67,6 +67,14 @@ export default function App() {
     setLastGeneratedChunkIndex(0); // reset if text completely changes
   }, [text]);
 
+  // Sync pitch and rate when selectedProfile changes
+  useEffect(() => {
+    if (selectedProfile) {
+      setPitch(selectedProfile.defaultPitch || 1.0);
+      setRate(selectedProfile.defaultRate || 1.0);
+    }
+  }, [selectedProfile]);
+
   const toggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
@@ -140,6 +148,8 @@ export default function App() {
     try {
       const { wavBlob } = await CloudSpeechSynthesizer.synthesize(text, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
+        pitch: pitch,
+        rate: rate,
         startIndex: 0,
         maxChunks: 20, // Preview only first 20 chunks to avoid timeout
         onProgress: (progress) => setGenerationProgress(progress)
@@ -173,6 +183,8 @@ export default function App() {
     try {
       const { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
+        pitch: pitch,
+        rate: rate
       });
       if (wavBlob) {
         setIsSpeaking(true);
@@ -194,7 +206,11 @@ export default function App() {
     setIsGenerating(true);
     const sample = profile.sampleText || 'AetherVocal Studio Speech Synthesis';
     try {
-      const { wavBlob } = await CloudSpeechSynthesizer.synthesize(sample, { lang: 'hi' }); // fallback
+      const { wavBlob } = await CloudSpeechSynthesizer.synthesize(sample, { 
+        lang: profile.lang || 'hi',
+        pitch: profile.defaultPitch || 1.0,
+        rate: profile.defaultRate || 1.0 
+      });
       if (wavBlob) {
         await playBlob(wavBlob);
       }
@@ -204,6 +220,29 @@ export default function App() {
       setIsGenerating(false);
     }
   }, []);
+
+  // ─── DOWNLOAD SINGLE CHUNK ───
+  const handleDownloadSingleChunk = useCallback(async (chunkText, index) => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setDownloadError('');
+    try {
+      const { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
+        lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
+        pitch: pitch,
+        rate: rate,
+      });
+      if (wavBlob) {
+        MobileSafeAudioExporter.resumeAudioContext();
+        MobileSafeAudioExporter.download(wavBlob, `AetherVocal_Chunk_${index + 1}.wav`);
+      }
+    } catch (err) {
+      console.warn('Chunk download error:', err);
+      setDownloadError(err?.message || 'Chunk download failed.');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [targetLang, pitch, rate, isGenerating]);
 
   // ─── DOWNLOAD: BLOCK GENERATION ───
   const handleGenerateBlock = useCallback(async () => {
@@ -216,6 +255,8 @@ export default function App() {
     try {
       const { wavBlob, endIndex, isComplete } = await CloudSpeechSynthesizer.synthesize(text, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
+        pitch: pitch,
+        rate: rate,
         startIndex: lastGeneratedChunkIndex,
         maxChunks: 20, // Strict API limit per block
         onProgress: (progress) => {
@@ -362,8 +403,9 @@ export default function App() {
             <ChunkQueue
               chunks={chunks}
               activeChunkIndex={activeChunkIndex}
-              isSpeaking={isSpeaking}
-              onPlayChunk={handlePlaySingleChunk}
+              isPlaying={isSpeaking}
+              onPlaySingleChunk={handlePlaySingleChunk}
+              onDownloadSingleChunk={handleDownloadSingleChunk}
             />
 
             <AudioHistory

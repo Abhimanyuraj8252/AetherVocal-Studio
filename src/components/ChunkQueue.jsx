@@ -1,11 +1,12 @@
 import React from 'react';
-import { Layers, Play, CheckCircle2, Activity, Sparkles, Volume2 } from 'lucide-react';
+import { Layers, Play, CheckCircle2, Activity, Sparkles, Volume2, Download } from 'lucide-react';
 
 export function ChunkQueue({
   chunks,
   activeChunkIndex,
   isPlaying,
-  onPlaySingleChunk
+  onPlaySingleChunk,
+  onDownloadSingleChunk
 }) {
   if (!chunks || chunks.length === 0) return null;
 
@@ -67,14 +68,24 @@ export function ChunkQueue({
 
               <p className="chunk-text-preview">{chunkText}</p>
 
-              <button
-                type="button"
-                onClick={() => onPlaySingleChunk(chunkText, idx)}
-                className="btn-play-chunk-sm"
-                title="Play this sentence chunk"
-              >
-                <Play className="w-3.5 h-3.5 text-cyan-400 fill-current" />
-              </button>
+              <div className="chunk-actions">
+                <button
+                  type="button"
+                  onClick={() => onPlaySingleChunk(chunkText, idx)}
+                  className="btn-play-chunk-sm"
+                  title="Play this sentence chunk"
+                >
+                  <Play className="w-3.5 h-3.5 text-cyan-400 fill-current" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDownloadSingleChunk(chunkText, idx)}
+                  className="btn-play-chunk-sm btn-download-chunk-sm"
+                  title="Download this sentence chunk"
+                >
+                  <Download className="w-3.5 h-3.5 text-purple-400" />
+                </button>
+              </div>
             </div>
           );
         })}

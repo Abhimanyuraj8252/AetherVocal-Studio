@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { History, Play, Trash2, Music, CheckSquare, Square, Layers } from 'lucide-react';
+import { History, Play, Trash2, Music, CheckSquare, Square, Layers, Download } from 'lucide-react';
 
 export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem, onCombineAndDownload, isGenerating }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -38,16 +38,20 @@ export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem, 
         </div>
 
         <div className="history-header-actions">
-          {selectedIds.size > 1 && (
+          {selectedIds.size > 0 && (
             <button
               type="button"
               onClick={() => onCombineAndDownload(Array.from(selectedIds))}
               disabled={isGenerating}
               className="btn-combine-download"
-              title="Stitch selected parts gaplessly and download"
+              title={selectedIds.size === 1 ? "Download selected part" : "Stitch selected parts gaplessly and download"}
             >
-              <Layers style={{ width: 14, height: 14 }} />
-              Combine & Download ({selectedIds.size})
+              {selectedIds.size === 1 ? (
+                <Download style={{ width: 14, height: 14 }} />
+              ) : (
+                <Layers style={{ width: 14, height: 14 }} />
+              )}
+              {selectedIds.size === 1 ? 'Download Part' : `Combine & Download (${selectedIds.size})`}
             </button>
           )}
 
@@ -123,7 +127,17 @@ export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem, 
                 </div>
               </div>
 
-              <div className="history-actions">
+              <div className="history-actions" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onCombineAndDownload([item.id]); }}
+                  disabled={isGenerating}
+                  className="btn-play-chunk-sm"
+                  style={{ borderColor: 'rgba(168, 85, 247, 0.4)', background: 'rgba(168, 85, 247, 0.1)' }}
+                  title="Download this part"
+                >
+                  <Download style={{ width: 12, height: 12, color: '#c084fc' }} />
+                </button>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onPlayHistoryItem(item); }}
