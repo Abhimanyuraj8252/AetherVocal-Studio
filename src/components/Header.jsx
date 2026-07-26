@@ -1,14 +1,13 @@
 import React from 'react';
-import { Volume2, Sparkles, WifiOff, Globe, Sun, Moon } from 'lucide-react';
+import { Sparkles, WifiOff, Globe, Sun, Moon } from 'lucide-react';
+import { Logo } from './Logo';
 
 export function Header({ theme, toggleTheme }) {
   return (
     <header className="header-glass">
       <div className="header-container">
         <div className="brand-badge">
-          <div className="logo-icon-wrapper">
-            <Volume2 className="logo-icon" />
-          </div>
+          <Logo className="w-10 h-10 transform hover:scale-105 transition-transform duration-300" />
           <div>
             <h1 className="brand-title">
               AetherVocal <span className="brand-accent">Studio</span>
