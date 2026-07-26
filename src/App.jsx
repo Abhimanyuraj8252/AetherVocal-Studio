@@ -348,7 +348,7 @@ export default function App() {
         <FeatureCards />
 
         <div className="grid-container">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 min-w-0 w-full overflow-hidden">
             <TextEditor
               text={text}
               setText={setText}
@@ -375,7 +375,7 @@ export default function App() {
             />
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 min-w-0 w-full overflow-hidden">
             <VoiceSelector
               systemVoices={[]}
               selectedProfile={selectedProfile}

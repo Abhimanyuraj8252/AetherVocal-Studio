@@ -88,8 +88,10 @@ export function VoiceSelector({
             onClick={() => setSelectedEngine('sherpa-onnx')}
             className={`neural-engine-btn ${selectedEngine === 'sherpa-onnx' ? 'engine-active' : ''}`}
           >
-            <Zap className="w-3.5 h-3.5 text-amber-400 inline mr-1" />
-            <span>Sherpa-ONNX</span>
+            <div className="engine-btn-left">
+              <Zap className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              <span className="engine-btn-title">Sherpa-ONNX</span>
+            </div>
             <span className="engine-badge-tag">VITS ONNX</span>
           </button>
 
@@ -98,8 +100,10 @@ export function VoiceSelector({
             onClick={() => setSelectedEngine('piper-ai')}
             className={`neural-engine-btn ${selectedEngine === 'piper-ai' ? 'engine-active' : ''}`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-pink-400 inline mr-1" />
-            <span>Piper Acoustic</span>
+            <div className="engine-btn-left">
+              <Sparkles className="w-3.5 h-3.5 text-pink-400 flex-shrink-0" />
+              <span className="engine-btn-title">Piper Acoustic</span>
+            </div>
             <span className="engine-badge-tag">Piper AI</span>
           </button>
 
@@ -108,9 +112,24 @@ export function VoiceSelector({
             onClick={() => setSelectedEngine('aethervocal-pro')}
             className={`neural-engine-btn ${selectedEngine === 'aethervocal-pro' ? 'engine-active' : ''}`}
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline mr-1" />
-            <span>AetherVocal Pro</span>
+            <div className="engine-btn-left">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+              <span className="engine-btn-title">AetherVocal Pro</span>
+            </div>
             <span className="engine-badge-tag">Studio</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedEngine('google-tts')}
+            className={`neural-engine-btn ${selectedEngine === 'google-tts' ? 'engine-active' : ''}`}
+            style={selectedEngine === 'google-tts' ? { borderColor: '#4285F4', background: 'rgba(66, 133, 244, 0.1)' } : {}}
+          >
+            <div className="engine-btn-left">
+              <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+              <span className="engine-btn-title">Google Neural</span>
+            </div>
+            <span className="engine-badge-tag" style={{ color: '#4285F4', background: 'rgba(66, 133, 244, 0.15)' }}>Cloud API</span>
           </button>
         </div>
       </div>
@@ -133,7 +152,7 @@ export function VoiceSelector({
               className={`segmented-btn ${targetLang === 'hi' ? 'active' : ''}`}
               onClick={() => setTargetLang('hi')}
             >
-              Hindi (हिंदी)
+              Hindi
             </button>
             <button
               type="button"
@@ -161,14 +180,14 @@ export function VoiceSelector({
               className={`segmented-btn ${targetGender === 'female' ? 'active' : ''}`}
               onClick={() => setTargetGender('female')}
             >
-              Female (महिला)
+              Female
             </button>
             <button
               type="button"
               className={`segmented-btn ${targetGender === 'male' ? 'active' : ''}`}
               onClick={() => setTargetGender('male')}
             >
-              Male (पुरुष)
+              Male
             </button>
           </div>
         </div>
@@ -198,7 +217,7 @@ export function VoiceSelector({
               </div>
 
               <div className="profile-actions">
-                <div className="flex items-center gap-1">
+                <div className="profile-badges-row">
                   <span className="badge badge-sm badge-lang">
                     {profile.lang} • {profile.gender}
                   </span>
@@ -242,16 +261,16 @@ export function VoiceSelector({
             className="custom-range range-cyan"
           />
           <div className="range-marks">
-            <span>0.5x (Slow)</span>
+            <span>0.5x</span>
             <span className="font-bold text-cyan-400">1.0x (Normal)</span>
-            <span>1.8x (Fast)</span>
+            <span>1.8x</span>
           </div>
         </div>
 
         {/* Voice Pitch Slider */}
         <div className="slider-card">
           <div className="slider-header">
-            <span className="slider-label">Voice Pitch (पिच / Gender Tone)</span>
+            <span className="slider-label">Voice Pitch (पिच)</span>
             <span className="slider-value">{pitch.toFixed(2)}</span>
           </div>
           <input
@@ -264,9 +283,9 @@ export function VoiceSelector({
             className="custom-range range-purple"
           />
           <div className="range-marks">
-            <span>0.70 (Deep Male)</span>
-            <span>1.0 (Neutral)</span>
-            <span>1.30 (High Female)</span>
+            <span>0.70 (Deep)</span>
+            <span>1.0 (Default)</span>
+            <span>1.30 (High)</span>
           </div>
         </div>
       </div>

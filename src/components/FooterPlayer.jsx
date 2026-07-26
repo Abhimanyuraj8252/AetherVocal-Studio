@@ -115,9 +115,9 @@ export function FooterPlayer({
                 <Download className="w-4 h-4 flex-shrink-0" />
                 <span>
                   {isComplete 
-                    ? 'All Parts Generated (Select in History to Combine)' 
+                    ? 'All Parts Ready (Combine in History)' 
                     : nextChunkIndex > 0 
-                      ? `Generate Next Part (${nextChunkIndex + 1} to ${Math.min(nextChunkIndex + 20, totalChunks)})` 
+                      ? `Generate Part ${Math.floor(nextChunkIndex / 20) + 1}` 
                       : 'Generate Audio (Part 1)'}
                 </span>
               </>

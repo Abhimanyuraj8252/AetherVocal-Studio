@@ -81,8 +81,8 @@ export function AudioVisualizer({ isPlaying, isRecording }) {
       </div>
       <canvas 
         ref={canvasRef} 
-        width={500} 
-        height={70} 
+        width={320} 
+        height={60} 
         className="visualizer-canvas"
       />
     </div>
