@@ -193,49 +193,54 @@ export function VoiceSelector({
         </div>
       </div>
 
-      {/* Master Voice Models Grid */}
-      <div className="voice-profiles-grid scrollable-profiles mb-3">
+      {/* Master Voice Models List View */}
+      <div className="scrollable-profiles mb-3">
         {(filteredProfiles.length > 0 ? filteredProfiles : PREMIUM_VOICE_PROFILES).map(profile => {
           const isSelected = selectedProfile && selectedProfile.id === profile.id;
           return (
             <div
               key={profile.id}
               onClick={() => setSelectedProfile(profile)}
-              className={`voice-profile-card ${isSelected ? 'selected-profile' : ''}`}
+              className={`voice-list-item ${isSelected ? 'selected-voice-item' : ''}`}
             >
-              <div className="profile-header">
-                <span className="profile-avatar">{profile.avatar}</span>
-                <div className="profile-info">
-                  <div className="flex items-center gap-1">
-                    <h4 className="profile-name">{profile.name}</h4>
-                  </div>
-                  <span className="profile-style">{profile.description}</span>
+              <div className="voice-item-left">
+                <div className="voice-avatar-box">
+                  <span>{profile.avatar}</span>
                 </div>
-                {isSelected && (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                )}
+
+                <div className="voice-item-details">
+                  <div className="voice-title-row">
+                    <h4 className="voice-item-name">{profile.name}</h4>
+                    {isSelected && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 ml-1" />
+                    )}
+                  </div>
+
+                  <p className="voice-item-desc">{profile.description}</p>
+
+                  <div className="voice-badges-row">
+                    <span className="badge-pill badge-lang">
+                      {profile.lang} • {profile.gender}
+                    </span>
+                    <span className="badge-pill badge-model">
+                      {profile.modelTag}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="profile-actions">
-                <div className="profile-badges-row">
-                  <span className="badge badge-sm badge-lang">
-                    {profile.lang} • {profile.gender}
-                  </span>
-                  <span className="model-architecture-badge">
-                    {profile.modelTag}
-                  </span>
-                </div>
-
+              <div className="voice-item-right">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onPlaySample(profile);
                   }}
-                  className="btn-sample-preview"
+                  className="btn-try-sample"
+                  title="Listen to voice sample"
                 >
-                  <Play className="w-3 h-3 inline mr-1 fill-current" />
-                  Try Sample
+                  <Play className="w-3 h-3 fill-current" />
+                  <span>Sample</span>
                 </button>
               </div>
             </div>
