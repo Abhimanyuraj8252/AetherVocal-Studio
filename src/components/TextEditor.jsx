@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Sparkles, Check, Copy, Trash2, Zap, BookOpen, Briefcase, Video, UploadCloud, Languages, Clock, RefreshCw, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Sparkles, Check, Copy, Trash2, Zap, BookOpen, Briefcase, Video, UploadCloud, Languages, Clock, RefreshCw, ArrowRight, PauseCircle, Gauge, SpellCheck, Search } from 'lucide-react';
 import { FileUploader } from './FileUploader';
 import { stripTimestamps, countTimestamps, sanitizeScript } from '../utils/textSanitizer';
 import { translateScript, SUPPORTED_LANGUAGES } from '../utils/translator';
+import { detectJargonAcronyms, expandJargonAcronyms, analyzeScriptMetrics } from '../utils/scriptAnalyzer';
 
 const SAMPLE_SCRIPTS = [
   {
@@ -43,15 +44,24 @@ export function TextEditor({
 }) {
   const [activeTab, setActiveTab] = useState('editor'); // 'editor' | 'upload' | 'translate' | 'preview'
   const [copied, setCopied] = useState(false);
+  const textareaRef = useRef(null);
 
   // Translation State
   const [targetLangCode, setTargetLangCode] = useState('hi');
+  const [langSearchQuery, setLangSearchQuery] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
-  const [translationProgress, setTranslationProgress] = useState(null); // { current, total, percent }
+  const [translationProgress, setTranslationProgress] = useState(null);
   const [translateSuccessMsg, setTranslateSuccessMsg] = useState('');
 
-  // Timestamp State
+  const filteredLanguages = SUPPORTED_LANGUAGES.filter(lang => 
+    lang.name.toLowerCase().includes(langSearchQuery.toLowerCase()) ||
+    lang.code.toLowerCase().includes(langSearchQuery.toLowerCase())
+  );
+
+  // Timestamp & Jargon State
   const timestampCount = countTimestamps(text);
+  const detectedJargon = detectJargonAcronyms(text);
+  const scriptMetrics = analyzeScriptMetrics(text);
 
   // Handle Text Changes & Live Auto-Clean
   const handleTextChange = (newVal) => {
@@ -97,6 +107,24 @@ export function TextEditor({
     }
   };
 
+  // Insert Natural Speech Pause Tag at Cursor Position
+  const handleInsertPause = (seconds) => {
+    const pauseTag = ` [pause=${seconds}s] `;
+    const textarea = textareaRef.current;
+    if (textarea && typeof textarea.selectionStart === 'number') {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const updated = text.substring(0, start) + pauseTag + text.substring(end);
+      setText(updated);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + pauseTag.length, start + pauseTag.length);
+      }, 50);
+    } else {
+      setText(prev => prev + pauseTag);
+    }
+  };
+
   // Dedicated Timestamp Stripper Handler
   const handleStripTimestamps = () => {
     if (!text) return;
@@ -105,6 +133,13 @@ export function TextEditor({
       stripped = sanitizeScript(stripped);
     }
     setText(stripped);
+  };
+
+  // Expand Jargon & Acronyms Handler (e.g. AI -> ए आई)
+  const handleExpandJargon = () => {
+    if (!text) return;
+    const expanded = expandJargonAcronyms(text);
+    setText(expanded);
   };
 
   // Free Script Translation Handler
@@ -143,8 +178,8 @@ export function TextEditor({
         <div className="card-title-group">
           <FileText className="card-icon text-cyan-400" />
           <div>
-            <h3 className="card-title">Text Script, Translator & Cleaner</h3>
-            <p className="card-description">Type/paste script, upload files, strip timestamps & translate instantly</p>
+            <h3 className="card-title">Text Script & AI Studio Enhancer</h3>
+            <p className="card-description">Type/paste script, insert speech pauses, strip timestamps & translate</p>
           </div>
         </div>
 
@@ -224,6 +259,58 @@ export function TextEditor({
         </div>
       </div>
 
+      {/* Studio Pause & Jargon Toolbar Bar */}
+      <div className="studio-toolbar-row flex items-center justify-between gap-2 px-3 py-1.5 bg-slate-900/60 border-y border-slate-800 text-xs">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-slate-400 font-medium flex items-center gap-1">
+            <PauseCircle className="w-3.5 h-3.5 text-cyan-400" /> Insert Pause:
+          </span>
+          <button
+            type="button"
+            onClick={() => handleInsertPause(0.5)}
+            className="btn-chip-xs btn-chip-cyan"
+            title="Insert 0.5s Speech Pause"
+          >
+            +0.5s
+          </button>
+          <button
+            type="button"
+            onClick={() => handleInsertPause(1.0)}
+            className="btn-chip-xs btn-chip-cyan"
+            title="Insert 1.0s Speech Pause"
+          >
+            +1.0s
+          </button>
+          <button
+            type="button"
+            onClick={() => handleInsertPause(2.0)}
+            className="btn-chip-xs btn-chip-cyan"
+            title="Insert 2.0s Speech Pause"
+          >
+            +2.0s
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {detectedJargon.length > 0 && (
+            <button
+              type="button"
+              onClick={handleExpandJargon}
+              className="btn-xs btn-outline-pink flex items-center gap-1 animate-pulse"
+              title="Expand acronyms phonetically for clearer AI voice pronunciation (e.g. AI -> ए आई)"
+            >
+              <SpellCheck className="w-3 h-3 text-pink-400" />
+              Expand Jargon ({detectedJargon.length})
+            </button>
+          )}
+
+          <span className="text-slate-400 text-xs flex items-center gap-1">
+            <Gauge className="w-3.5 h-3.5 text-amber-400" />
+            Pacing: <strong className="text-amber-400">{scriptMetrics.pacingTag}</strong> (~{scriptMetrics.estimatedWpm} WPM)
+          </span>
+        </div>
+      </div>
+
       {/* Translation Toolbar Drawer */}
       {activeTab === 'translate' && (
         <div className="translation-drawer-card p-3 my-2 bg-slate-900/80 border border-pink-500/30 rounded-xl">
@@ -231,23 +318,39 @@ export function TextEditor({
             <div className="flex items-center gap-2">
               <Languages className="w-5 h-5 text-pink-400" />
               <div>
-                <h4 className="text-sm font-semibold text-slate-100">Free Instant Translator (No API Key Required)</h4>
-                <p className="text-xs text-slate-400">Translate your script into 10+ languages with full fidelity</p>
+                <h4 className="text-sm font-semibold text-slate-100">Free Instant Translator (50+ Languages)</h4>
+                <p className="text-xs text-slate-400">Search and translate script instantly without any API key</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              {/* Search Box */}
+              <div className="relative flex-1 sm:w-48">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search language..."
+                  value={langSearchQuery}
+                  onChange={(e) => setLangSearchQuery(e.target.value)}
+                  className="search-input-sm pl-8 pr-2 py-1 bg-slate-950/80 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-pink-500 w-full"
+                />
+              </div>
+
               <select
                 value={targetLangCode}
                 onChange={(e) => setTargetLangCode(e.target.value)}
                 disabled={isTranslating}
-                className="select-input-sm"
+                className="select-input-sm max-w-[200px]"
               >
-                {SUPPORTED_LANGUAGES.map(lang => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.flag} {lang.name}
-                  </option>
-                ))}
+                {filteredLanguages.length > 0 ? (
+                  filteredLanguages.map(lang => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.flag} {lang.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>No language found</option>
+                )}
               </select>
 
               <button
@@ -311,6 +414,7 @@ export function TextEditor({
       {/* Editor / Preview Body */}
       {activeTab === 'editor' || activeTab === 'translate' ? (
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => handleTextChange(e.target.value)}
           placeholder="यहाँ अपना हिन्दी या English टेक्स्ट टाइप करें, पेस्ट करें या फ़ाइल अपलोड करें..."
@@ -378,5 +482,6 @@ export function TextEditor({
     </div>
   );
 }
+
 
 

@@ -223,11 +223,11 @@ export function FileUploader({ onTextLoaded, onGenerateAudio, currentTextLength 
             </div>
 
             {/* Quick Actions Bar */}
-            <div className="file-actions-bar">
+            <div className="file-actions-bar flex flex-wrap sm:flex-nowrap items-center justify-stretch sm:justify-end gap-2 pt-2 mt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={handleAppendFileText}
-                className="btn-xs btn-outline-cyan"
+                className="btn-xs btn-outline-cyan w-full sm:w-auto justify-center py-1.5"
                 title="Append file text to existing text in editor"
               >
                 + Append to Editor
@@ -236,7 +236,7 @@ export function FileUploader({ onTextLoaded, onGenerateAudio, currentTextLength 
               <button
                 type="button"
                 onClick={() => onGenerateAudio && onGenerateAudio()}
-                className="btn-xs btn-emerald glow-emerald flex items-center gap-1"
+                className="btn-xs btn-emerald glow-emerald w-full sm:w-auto justify-center py-1.5 flex items-center gap-1"
               >
                 <Play className="w-3 h-3 fill-current" />
                 Generate Audio From File

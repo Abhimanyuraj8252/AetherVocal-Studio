@@ -8,10 +8,12 @@ import { VoiceSelector } from './components/VoiceSelector';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { FooterPlayer } from './components/FooterPlayer';
 import { AudioHistory } from './components/AudioHistory';
+import { StudioMixer } from './components/StudioMixer';
 import { PREMIUM_VOICE_PROFILES } from './utils/voiceProfiles';
 import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
 import { CloudSpeechSynthesizer } from './utils/CloudSpeechSynthesizer';
 import { AudioDB } from './utils/audioDB';
+import { mixAudioBlobWithBGM } from './utils/ambientSoundscapes';
 
 export default function App() {
   const [theme, setTheme] = useState('dark');
@@ -23,6 +25,11 @@ export default function App() {
   const [rate, setRate] = useState(1.0);
   const [pitch, setPitch] = useState(1.15);
   const [selectedFormat, setSelectedFormat] = useState('webm');
+
+  // Studio BGM & Mixer State
+  const [selectedBgm, setSelectedBgm] = useState('none');
+  const [bgmVolume, setBgmVolume] = useState(0.15);
+  const [reverbPreset, setReverbPreset] = useState('subtle');
 
   // Speech State
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -146,7 +153,7 @@ export default function App() {
     setIsGenerating(true);
 
     try {
-      const { wavBlob } = await CloudSpeechSynthesizer.synthesize(text, {
+      let { wavBlob } = await CloudSpeechSynthesizer.synthesize(text, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate,
@@ -157,6 +164,12 @@ export default function App() {
 
       if (!wavBlob) throw new Error('Audio generation failed.');
 
+      // Mix BGM Soundscape if enabled
+      if (selectedBgm !== 'none') {
+        setGenerationProgress({ current: 0, total: 100, percent: 99, statusText: 'Mixing ambient BGM soundscape...' });
+        wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
+      }
+
       setIsSpeaking(true);
       await playBlob(wavBlob);
     } catch (e) {
@@ -164,7 +177,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [text, isPaused, targetLang]);
+  }, [text, isPaused, targetLang, pitch, rate, selectedBgm, bgmVolume]);
 
   // ─── PAUSE ───
   const handlePause = useCallback(() => {
@@ -181,12 +194,15 @@ export default function App() {
     setActiveChunkIndex(index);
     setIsGenerating(true);
     try {
-      const { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
+      let { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate
       });
       if (wavBlob) {
+        if (selectedBgm !== 'none') {
+          wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
+        }
         setIsSpeaking(true);
         await playBlob(wavBlob);
       } else {
@@ -197,7 +213,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [targetLang]);
+  }, [targetLang, pitch, rate, selectedBgm, bgmVolume]);
 
   // ─── PLAY SAMPLE ───
   const handlePlaySample = useCallback(async (profile) => {
@@ -227,12 +243,15 @@ export default function App() {
     setIsGenerating(true);
     setDownloadError('');
     try {
-      const { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
+      let { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate,
       });
       if (wavBlob) {
+        if (selectedBgm !== 'none') {
+          wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
+        }
         MobileSafeAudioExporter.resumeAudioContext();
         MobileSafeAudioExporter.download(wavBlob, `AetherVocal_Chunk_${index + 1}.wav`);
       }
@@ -242,7 +261,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [targetLang, pitch, rate, isGenerating]);
+  }, [targetLang, pitch, rate, isGenerating, selectedBgm, bgmVolume]);
 
   // ─── DOWNLOAD: BLOCK GENERATION ───
   const handleGenerateBlock = useCallback(async () => {
@@ -253,7 +272,7 @@ export default function App() {
     setDownloadError('');
 
     try {
-      const { wavBlob, endIndex, isComplete } = await CloudSpeechSynthesizer.synthesize(text, {
+      let { wavBlob, endIndex, isComplete } = await CloudSpeechSynthesizer.synthesize(text, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate,
@@ -266,6 +285,12 @@ export default function App() {
 
       if (!wavBlob || wavBlob.size < 100) {
         throw new Error('Audio generation failed. Block might be empty.');
+      }
+
+      // Mix BGM Soundscape if enabled
+      if (selectedBgm !== 'none') {
+        setGenerationProgress({ current: 0, total: 100, percent: 99, statusText: 'Blending BGM soundscape into audio...' });
+        wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
       }
 
       // Save to IndexedDB
@@ -291,7 +316,6 @@ export default function App() {
       setLastGeneratedChunkIndex(endIndex);
 
       if (isComplete) {
-        // Automatically trigger combine if they only generated one part, or just let them select.
         setDownloadError("Generation complete. Select parts in History to Combine & Download!");
       }
 
@@ -301,7 +325,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex]);
+  }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume]);
 
   // ─── HISTORY ACTIONS ───
   const handleClearHistory = useCallback(async () => {
@@ -337,11 +361,9 @@ export default function App() {
 
     try {
       const blobsToCombine = [];
-      // To preserve order, map over audioHistory backwards, but the user selects them via UI checkboxes. 
-      // It's better to sort the selected IDs based on their chunksRange or order in history (bottom to top).
       const sortedSelectedItems = [...audioHistory]
         .filter(h => selectedIds.includes(h.id))
-        .reverse(); // History is newest first, so reverse to chronological order
+        .reverse();
 
       for (const item of sortedSelectedItems) {
         if (item.dbId) {
@@ -436,6 +458,15 @@ export default function App() {
               onStopSample={stopAudio}
             />
 
+            <StudioMixer
+              selectedBgm={selectedBgm}
+              setSelectedBgm={setSelectedBgm}
+              bgmVolume={bgmVolume}
+              setBgmVolume={setBgmVolume}
+              reverbPreset={reverbPreset}
+              setReverbPreset={setReverbPreset}
+            />
+
             <AudioVisualizer isSpeaking={isSpeaking || isPlayingSample || isGenerating} />
           </div>
         </div>
@@ -450,7 +481,7 @@ export default function App() {
         onPlay={handlePlayFullSpeech}
         onPause={handlePause}
         onStop={stopAudio}
-        onDownload={handleGenerateBlock} // Block generation triggers here
+        onDownload={handleGenerateBlock}
         onDismissError={handleDismissError}
         selectedFormat={selectedFormat}
         setSelectedFormat={setSelectedFormat}
@@ -462,3 +493,4 @@ export default function App() {
     </div>
   );
 }
+

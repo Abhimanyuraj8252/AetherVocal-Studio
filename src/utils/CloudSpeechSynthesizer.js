@@ -250,10 +250,26 @@ export class CloudSpeechSynthesizer {
    * Fetches audio for a single chunk and decodes into AudioBuffer
    */
   static async fetchAndDecodeChunk(chunk, lang, audioCtx, retries = 2) {
+    // Check for natural pause tags (e.g. [pause=1.0s] or [pause=0.5])
+    const pauseMatch = chunk.match(/\[pause=([\d.]+)s?\]/i);
+    if (pauseMatch) {
+      const pauseSecs = parseFloat(pauseMatch[1]) || 0.5;
+      const sampleRate = audioCtx.sampleRate || 44100;
+      const length = Math.max(1, Math.ceil(pauseSecs * sampleRate));
+      const silentBuffer = audioCtx.createBuffer(1, length, sampleRate);
+      return silentBuffer;
+    }
+
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const primaryUrl = `https://lingva.ml/api/v1/audio/${lang}/${encodeURIComponent(chunk)}`;
+        const cleanChunk = chunk.replace(/\[pause=[\d.]+s?\]/gi, '').trim();
+        if (!cleanChunk) {
+          const silentBuffer = audioCtx.createBuffer(1, 22050, audioCtx.sampleRate || 44100);
+          return silentBuffer;
+        }
+
+        const primaryUrl = `https://lingva.ml/api/v1/audio/${lang}/${encodeURIComponent(cleanChunk)}`;
         const response = await fetch(primaryUrl);
         
         if (response.ok) {
@@ -266,7 +282,7 @@ export class CloudSpeechSynthesizer {
         }
 
         // Fallback: direct Google Translate TTS endpoint
-        const fallbackUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&q=${encodeURIComponent(chunk)}&tl=${lang}`;
+        const fallbackUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&q=${encodeURIComponent(cleanChunk)}&tl=${lang}`;
         const res = await fetch(fallbackUrl);
         if (res.ok) {
           const arrayBuffer = await res.arrayBuffer();

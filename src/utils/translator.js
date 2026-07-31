@@ -1,9 +1,11 @@
 /**
  * Free Script Translator Utility for AetherVocal Studio
  * Uses free public translation endpoint (No API Key required)
+ * Supports 50+ Global Languages with Search Filtering
  */
 
 export const SUPPORTED_LANGUAGES = [
+  // Indian Languages
   { code: 'hi', name: 'Hindi (हिन्दी)', flag: '🇮🇳' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
   { code: 'mr', name: 'Marathi (मराठी)', flag: '🇮🇳' },
@@ -11,9 +13,54 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'ta', name: 'Tamil (தமிழ்)', flag: '🇮🇳' },
   { code: 'te', name: 'Telugu (తెలుగు)', flag: '🇮🇳' },
   { code: 'gu', name: 'Gujarati (ગુજરાતી)', flag: '🇮🇳' },
+  { code: 'kn', name: 'Kannada (ಕನ್ನಡ)', flag: '🇮🇳' },
+  { code: 'ml', name: 'Malayalam (മലയാളം)', flag: '🇮🇳' },
+  { code: 'pa', name: 'Punjabi (ਪੰਜਾਬੀ)', flag: '🇮🇳' },
+  { code: 'ur', name: 'Urdu (اردو)', flag: '🇵🇰' },
+  { code: 'or', name: 'Odia (ଓଡ଼ିଆ)', flag: '🇮🇳' },
+  { code: 'ne', name: 'Nepali (नेपाली)', flag: '🇳🇵' },
+  { code: 'si', name: 'Sinhala (සිංහල)', flag: '🇱🇰' },
+
+  // International Languages
   { code: 'es', name: 'Spanish (Español)', flag: '🇪🇸' },
   { code: 'fr', name: 'French (Français)', flag: '🇫🇷' },
-  { code: 'de', name: 'German (Deutsch)', flag: '🇩🇪' }
+  { code: 'de', name: 'German (Deutsch)', flag: '🇩🇪' },
+  { code: 'ja', name: 'Japanese (日本語)', flag: '🇯🇵' },
+  { code: 'ko', name: 'Korean (한국어)', flag: '🇰🇷' },
+  { code: 'zh-CN', name: 'Chinese Simplified (简体中文)', flag: '🇨🇳' },
+  { code: 'zh-TW', name: 'Chinese Traditional (繁體中文)', flag: '🇨🇳' },
+  { code: 'ar', name: 'Arabic (العربية)', flag: '🇸🇦' },
+  { code: 'ru', name: 'Russian (Русский)', flag: '🇷🇺' },
+  { code: 'pt', name: 'Portuguese (Português)', flag: '🇵🇹' },
+  { code: 'it', name: 'Italian (Italiano)', flag: '🇮🇹' },
+  { code: 'nl', name: 'Dutch (Nederlands)', flag: '🇳🇱' },
+  { code: 'tr', name: 'Turkish (Türkçe)', flag: '🇹🇷' },
+  { code: 'vi', name: 'Vietnamese (Tiếng Việt)', flag: '🇻🇳' },
+  { code: 'id', name: 'Indonesian (Bahasa Indonesia)', flag: '🇮🇩' },
+  { code: 'th', name: 'Thai (ไทย)', flag: '🇹🇭' },
+  { code: 'tl', name: 'Filipino (Tagalog)', flag: '🇵🇭' },
+  { code: 'pl', name: 'Polish (Polski)', flag: '🇵🇱' },
+  { code: 'uk', name: 'Ukrainian (Українська)', flag: '🇺🇦' },
+  { code: 'cs', name: 'Czech (Čeština)', flag: '🇨🇿' },
+  { code: 'ro', name: 'Romanian (Română)', flag: '🇷🇴' },
+  { code: 'hu', name: 'Hungarian (Magyar)', flag: '🇭🇺' },
+  { code: 'el', name: 'Greek (Ελληνικά)', flag: '🇬🇷' },
+  { code: 'sv', name: 'Swedish (Svenska)', flag: '🇸🇪' },
+  { code: 'da', name: 'Danish (Dansk)', flag: '🇩🇰' },
+  { code: 'fi', name: 'Finnish (Suomi)', flag: '🇫🇮' },
+  { code: 'no', name: 'Norwegian (Norsk)', flag: '🇳🇴' },
+  { code: 'he', name: 'Hebrew (עברית)', flag: '🇮🇱' },
+  { code: 'fa', name: 'Persian (فارسی)', flag: '🇮🇷' },
+  { code: 'sw', name: 'Swahili (Kiswahili)', flag: '🇰🇪' },
+  { code: 'am', name: 'Amharic (አማርኛ)', flag: '🇪🇹' },
+  { code: 'my', name: 'Burmese (မြန်မာစာ)', flag: '🇲🇲' },
+  { code: 'km', name: 'Khmer (ភាសាខ្មែរ)', flag: '🇰🇭' },
+  { code: 'ms', name: 'Malay (Bahasa Melayu)', flag: '🇲🇾' },
+  { code: 'af', name: 'Afrikaans', flag: '🇿🇦' },
+  { code: 'sq', name: 'Albanian (Shqip)', flag: '🇦🇱' },
+  { code: 'hr', name: 'Croatian (Hrvatski)', flag: '🇭🇷' },
+  { code: 'sk', name: 'Slovak (Slovenčina)', flag: '🇸🇰' },
+  { code: 'sr', name: 'Serbian (Српски)', flag: '🇷🇸' }
 ];
 
 /**
@@ -56,7 +103,6 @@ async function translateChunk(chunkText, targetLangCode) {
   }
 
   const data = await response.json();
-  // Structure of data: [[["translated_text", "original_text", ...], ...]]
   if (Array.isArray(data) && Array.isArray(data[0])) {
     return data[0].map(item => item[0]).join('');
   }
@@ -66,11 +112,6 @@ async function translateChunk(chunkText, targetLangCode) {
 
 /**
  * Translates full script text into target language with progress callbacks.
- * 
- * @param {string} text Full script text
- * @param {string} targetLangCode Target language code (e.g. 'hi', 'en')
- * @param {function} onProgress Progress callback ({ current, total, percent })
- * @returns {Promise<string>} Translated text
  */
 export async function translateScript(text, targetLangCode, onProgress = null) {
   if (!text || !text.trim()) return '';
@@ -93,10 +134,9 @@ export async function translateScript(text, targetLangCode, onProgress = null) {
       translatedChunks.push(translated);
     } catch (err) {
       console.warn(`Translation failed for chunk ${i + 1}, using original chunk`, err);
-      translatedChunks.push(chunk); // Fallback to original text if fetch fails
+      translatedChunks.push(chunk);
     }
 
-    // Small throttle delay between requests to prevent rate limiting
     if (chunks.length > 1 && i < chunks.length - 1) {
       await new Promise(resolve => setTimeout(resolve, 200));
     }
