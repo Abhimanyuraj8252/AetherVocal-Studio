@@ -35,10 +35,10 @@ export default function App() {
   const [bgmVolume, setBgmVolume] = useState(0.15);
   const [reverbPreset, setReverbPreset] = useState('subtle');
 
-  // Speech State
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isPlayingSample, setIsPlayingSample] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [chunks, setChunks] = useState([]);
   const [activeChunkIndex, setActiveChunkIndex] = useState(-1);
 
@@ -159,6 +159,7 @@ export default function App() {
     setIsSpeaking(false);
     setIsPaused(false);
     setIsPlayingSample(false);
+    setIsPreviewLoading(false);
     setActiveChunkIndex(-1);
   };
 
@@ -174,7 +175,7 @@ export default function App() {
     }
 
     stopAudio();
-    // NOTE: We do NOT set isGenerating here — preview is non-blocking
+    setIsPreviewLoading(true);
 
     try {
       const synthesizeOptions = {
@@ -185,28 +186,43 @@ export default function App() {
         maxChunks: 20, // Preview only first 20 chunks to avoid timeout
       };
       
-      let wavBlob;
-      if (selectedProfile?.engine === 'edge-tts') {
-        const result = await EdgeTTSSynthesizer.synthesize(text, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
-        wavBlob = result.wavBlob;
-      } else {
-        const result = await CloudSpeechSynthesizer.synthesize(text, synthesizeOptions);
-        wavBlob = result.wavBlob;
+      let wavBlob = null;
+
+      // 1. Try Primary Synthesizer Engine (Edge TTS or Cloud Synthesizer)
+      try {
+        if (selectedProfile?.engine === 'edge-tts') {
+          const result = await EdgeTTSSynthesizer.synthesize(text, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+          wavBlob = result?.wavBlob;
+        } else {
+          const result = await CloudSpeechSynthesizer.synthesize(text, synthesizeOptions);
+          wavBlob = result?.wavBlob;
+        }
+      } catch (primaryErr) {
+        console.warn("Primary TTS engine failed, trying fallback Cloud Synthesizer:", primaryErr);
+        try {
+          const result = await CloudSpeechSynthesizer.synthesize(text, synthesizeOptions);
+          wavBlob = result?.wavBlob;
+        } catch (fallbackErr) {
+          console.error("All TTS engines failed:", fallbackErr);
+        }
       }
 
-      if (!wavBlob) throw new Error('Audio generation failed.');
+      if (!wavBlob) throw new Error('Audio synthesis failed. Please check network connection.');
 
       // Mix BGM Soundscape if enabled
       if (selectedBgm !== 'none') {
         wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
       }
 
+      setIsPreviewLoading(false);
       setIsSpeaking(true);
       await playBlob(wavBlob);
     } catch (e) {
-      setDownloadError(e.message || "Failed to preview.");
+      setIsPreviewLoading(false);
+      setIsSpeaking(false);
+      setDownloadError(e.message || "Failed to preview audio.");
     }
-  }, [text, isPaused, targetLang, pitch, rate, selectedBgm, bgmVolume]);
+  }, [text, isPaused, targetLang, pitch, rate, selectedBgm, bgmVolume, selectedProfile]);
 
   // ─── PAUSE ───
   const handlePause = useCallback(() => {
@@ -631,9 +647,10 @@ export default function App() {
   const charCount = text.length;
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
   const totalSeconds = Math.ceil(charCount / (12 * rate));
-  const mins = Math.floor(totalSeconds / 60);
+  const hrs = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
   const secs = totalSeconds % 60;
-  const formattedDuration = `${mins}m ${secs}s`;
+  const formattedDuration = hrs > 0 ? `${hrs}h ${mins}m ${secs}s` : `${mins}m ${secs}s`;
 
   return (
     <div className="app-layout">
@@ -719,6 +736,7 @@ export default function App() {
       <FooterPlayer
         isSpeaking={isSpeaking}
         isPaused={isPaused}
+        isPreviewLoading={isPreviewLoading}
         isGenerating={isGenerating}
         generationProgress={generationProgress}
         downloadError={downloadError}

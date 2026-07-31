@@ -4,6 +4,7 @@ import { Play, Pause, Square, Download, Loader2, X, AlertTriangle, Zap, XCircle,
 export function FooterPlayer({
   isSpeaking,
   isPaused,
+  isPreviewLoading = false,
   isGenerating,
   generationProgress,
   downloadError,
@@ -194,7 +195,16 @@ export function FooterPlayer({
 
           {/* Player Controls Right Group */}
           <div className="player-primary-actions">
-            {!isSpeaking || isPaused ? (
+            {isPreviewLoading ? (
+              <button
+                type="button"
+                disabled
+                className="btn-player btn-play opacity-80"
+              >
+                <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                <span>Preparing Audio...</span>
+              </button>
+            ) : !isSpeaking || isPaused ? (
               <button
                 type="button"
                 onClick={onPlay}

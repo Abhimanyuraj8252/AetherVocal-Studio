@@ -3,11 +3,17 @@
  */
 
 export const BGM_PRESETS = [
-  { id: 'none', label: 'Off (Speech Only)', icon: '🔇' },
-  { id: 'lofi', label: '🎧 Cyberpunk Lo-Fi Drone', icon: '🌌' },
-  { id: 'rain', label: '🌧️ Peaceful Rain & Nature', icon: '🌧️' },
-  { id: 'corporate', label: '💼 Corporate Tech Pad', icon: '✨' },
-  { id: 'space', label: '🛸 Ethereal Space Ambient', icon: '🪐' }
+  { id: 'none', label: 'Off (Speech Only)', icon: '🔇', category: 'General' },
+  { id: 'news', label: '📰 Breaking News Pulse', icon: '📡', category: 'Broadcast' },
+  { id: 'story', label: '📖 Cinematic Storytelling', icon: '🌌', category: 'Story' },
+  { id: 'explainer', label: '💡 Tech & Explainer Video', icon: '⚡', category: 'YouTube' },
+  { id: 'drama', label: '🎭 Dramatic Suspense & Thriller', icon: '🔥', category: 'Drama' },
+  { id: 'podcast', label: '🎙️ Podcast Studio Warmth', icon: '🎧', category: 'Podcast' },
+  { id: 'lofi', label: '☕ Cyberpunk Chill Lo-Fi', icon: '🌆', category: 'Lo-Fi' },
+  { id: 'rain', label: '🌧️ Peaceful Rain & Nature', icon: '🌿', category: 'Nature' },
+  { id: 'corporate', label: '💼 Corporate Business Pad', icon: '✨', category: 'Corporate' },
+  { id: 'meditation', label: '🧘 Zen Meditation & Calm', icon: '🕉️', category: 'Relax' },
+  { id: 'space', label: '🛸 Ethereal Deep Space', icon: '🪐', category: 'Space' }
 ];
 
 /**
@@ -23,7 +29,7 @@ function createBGMBuffer(offlineCtx, bgmType, durationSeconds) {
   if (bgmType === 'none') return buffer;
 
   if (bgmType === 'rain') {
-    // Pink noise + lowpass filter for gentle rain
+    // Pink noise + lowpass filter for gentle rain soundscape
     let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < length; i++) {
       const white = Math.random() * 2 - 1;
@@ -35,12 +41,88 @@ function createBGMBuffer(offlineCtx, bgmType, durationSeconds) {
       b5 = -0.7616 * b5 - white * 0.0168980;
       const pink = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
       b6 = white * 0.115926;
-      const val = pink * 0.03;
+      const val = pink * 0.028;
+      left[i] = val;
+      right[i] = val;
+    }
+  } else if (bgmType === 'news') {
+    // Rhythmic 130 Hz news pulse synth + subtle sub bass ticker
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const pulse = Math.pow(Math.abs(Math.sin(2 * Math.PI * 2.5 * t)), 8);
+      const bass = 0.03 * Math.sin(2 * Math.PI * 110 * t) * (1 + 0.3 * pulse);
+      const ticker = 0.015 * Math.sin(2 * Math.PI * 440 * t) * pulse;
+      const sub = 0.02 * Math.sin(2 * Math.PI * 55 * t);
+      left[i] = bass + ticker + sub;
+      right[i] = bass + ticker * 0.8 + sub;
+    }
+  } else if (bgmType === 'story') {
+    // Cinematic mystery D-minor ambient swell (D2 73.4Hz, A2 110Hz, F3 174.6Hz, C4 261.6Hz)
+    const freqs = [73.41, 110.0, 174.61, 261.63];
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      let sampleL = 0;
+      let sampleR = 0;
+      freqs.forEach((freq, idx) => {
+        const lfo = 0.5 + 0.5 * Math.sin(2 * Math.PI * 0.08 * t + idx * 0.5);
+        const pan = Math.sin(2 * Math.PI * 0.1 * t + idx);
+        const s = 0.02 * Math.sin(2 * Math.PI * freq * t) * lfo;
+        sampleL += s * (1 - 0.2 * pan);
+        sampleR += s * (1 + 0.2 * pan);
+      });
+      left[i] = sampleL;
+      right[i] = sampleR;
+    }
+  } else if (bgmType === 'explainer') {
+    // Upbeat C Major tech synth pad (C3 130.8Hz, E3 164.8Hz, G3 196Hz, B3 246.9Hz)
+    const freqs = [130.81, 164.81, 196.00, 246.94];
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      let sample = 0;
+      freqs.forEach((freq, idx) => {
+        const shimmer = 1 + 0.12 * Math.sin(2 * Math.PI * 3 * t + idx);
+        sample += 0.02 * Math.sin(2 * Math.PI * freq * t) * shimmer;
+      });
+      left[i] = sample;
+      right[i] = sample;
+    }
+  } else if (bgmType === 'drama') {
+    // Deep dark suspense tension drone (F1 43.65Hz sub + detuned sawtooth pad)
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const tensionLfo = 0.4 + 0.6 * Math.abs(Math.sin(2 * Math.PI * 0.05 * t));
+      const sub = 0.04 * Math.sin(2 * Math.PI * 43.65 * t);
+      const detune1 = 0.02 * Math.sin(2 * Math.PI * 87.31 * t);
+      const detune2 = 0.018 * Math.sin(2 * Math.PI * 87.85 * t);
+      const highWail = 0.008 * Math.sin(2 * Math.PI * 349.23 * t) * tensionLfo;
+      left[i] = (sub + detune1 + highWail) * tensionLfo;
+      right[i] = (sub + detune2 + highWail * 0.8) * tensionLfo;
+    }
+  } else if (bgmType === 'podcast') {
+    // Warm analog tube studio soundscape (subtle 100Hz warmth + smooth analog tape air)
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const tubeWarmth = 0.02 * Math.sin(2 * Math.PI * 100 * t) + 0.01 * Math.sin(2 * Math.PI * 200 * t);
+      const airNoise = (Math.random() * 2 - 1) * 0.004;
+      left[i] = tubeWarmth + airNoise;
+      right[i] = tubeWarmth + airNoise;
+    }
+  } else if (bgmType === 'meditation') {
+    // 432 Hz Solfeggio meditation singing bowl synth
+    const f1 = 432.0;
+    const f2 = 216.0;
+    const f3 = 108.0;
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const lfo = 0.5 + 0.5 * Math.sin(2 * Math.PI * 0.04 * t);
+      const val = (0.025 * Math.sin(2 * Math.PI * f1 * t) +
+                   0.03 * Math.sin(2 * Math.PI * f2 * t) +
+                   0.035 * Math.sin(2 * Math.PI * f3 * t)) * lfo;
       left[i] = val;
       right[i] = val;
     }
   } else if (bgmType === 'lofi') {
-    // Warm chords (A minor synth pad: 220Hz, 261Hz, 329Hz, 392Hz)
+    // Warm A-minor synth pad (220Hz, 261.6Hz, 329.6Hz, 392Hz)
     const freqs = [220, 261.63, 329.63, 392.00];
     for (let i = 0; i < length; i++) {
       const t = i / sampleRate;

@@ -422,8 +422,67 @@ export function TextEditor({
           rows={6}
         />
       ) : activeTab === 'preview' ? (
-        <div className="main-textarea overflow-y-auto bg-slate-900/60 p-3 rounded-xl min-h-[140px] text-xs text-slate-200">
-          {text ? text : <span className="text-slate-500 italic">No clean preview text available. Type something or upload a file...</span>}
+        <div className="clean-preview-container">
+          <div className="clean-preview-header">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-xs font-semibold text-slate-300">Sanitized AI Voice Script Preview</span>
+            </div>
+            {text && (
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(text);
+                  alert("Clean preview text copied to clipboard!");
+                }}
+                className="btn-xs btn-outline-cyan flex items-center gap-1"
+                title="Copy clean preview text"
+              >
+                <Copy className="w-3 h-3" />
+                Copy Clean Text
+              </button>
+            )}
+          </div>
+          <div className="clean-preview-box">
+            {text ? (
+              text.split('\n\n').filter(p => p.trim()).map((paragraph, pIdx) => (
+                <div key={pIdx} className="clean-preview-paragraph-card">
+                  <span className="paragraph-num-badge">§ {(pIdx + 1).toString().padStart(2, '0')}</span>
+                  <div className="paragraph-content-text">
+                    {paragraph.split(/("[^"]*"|“[^”]*”|'[^']*'|\d+|\.\.\.|\u2026)/g).map((part, i) => {
+                      if (!part) return null;
+                      if (/^("[^"]*"|“[^”]*”|'[^']*')$/.test(part)) {
+                        return (
+                          <span key={i} className="highlight-dialogue">
+                            {part}
+                          </span>
+                        );
+                      }
+                      if (/^\d+$/.test(part)) {
+                        return (
+                          <span key={i} className="highlight-number">
+                            {part}
+                          </span>
+                        );
+                      }
+                      if (part === '...' || part === '…') {
+                        return (
+                          <span key={i} className="highlight-ellipsis">
+                            {part}
+                          </span>
+                        );
+                      }
+                      return <span key={i}>{part}</span>;
+                    })}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="clean-preview-empty">
+                <span>✨ No clean preview text available. Type or upload a story script in the editor above...</span>
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
 
