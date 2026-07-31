@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { History, Play, Trash2, Music, CheckSquare, Square, Layers, Download } from 'lucide-react';
+import { History, Play, Trash2, Music, CheckSquare, Square, Layers, Download, Loader2 } from 'lucide-react';
 
 export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem, onCombineAndDownload, isGenerating }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -46,12 +46,21 @@ export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem, 
               className="btn-combine-download"
               title={selectedIds.size === 1 ? "Download selected part" : "Stitch selected parts gaplessly and download"}
             >
-              {selectedIds.size === 1 ? (
-                <Download style={{ width: 14, height: 14 }} />
+              {isGenerating ? (
+                <>
+                  <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" />
+                  <span>Compressing...</span>
+                </>
               ) : (
-                <Layers style={{ width: 14, height: 14 }} />
+                <>
+                  {selectedIds.size === 1 ? (
+                    <Download style={{ width: 14, height: 14 }} />
+                  ) : (
+                    <Layers style={{ width: 14, height: 14 }} />
+                  )}
+                  {selectedIds.size === 1 ? 'Download Part' : `Combine & Download (${selectedIds.size})`}
+                </>
               )}
-              {selectedIds.size === 1 ? 'Download Part' : `Combine & Download (${selectedIds.size})`}
             </button>
           )}
 

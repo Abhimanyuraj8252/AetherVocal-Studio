@@ -33,6 +33,37 @@ export function stripTimestamps(text) {
 }
 
 /**
+ * Generates a safe, descriptive filename based on script text for cross-platform support (Android, iOS, Windows, macOS, Linux).
+ */
+export function generateSafeFilename(text, tag = '', ext = 'mp3') {
+  let cleanTitle = 'AetherVocal';
+  if (text && typeof text === 'string') {
+    // Strip timestamps, markdown, pause tags, code blocks
+    const cleanText = text
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/\[\s*pause=\d+(?:\.\d+)?s\s*\]/gi, '')
+      .replace(/\[\s*\d{1,2}:\d{2}(?::\d{2})?\s*\]/g, '')
+      .replace(/[#*~_`^|\\{}[\]$%&=+<>?/\\:*"<>|.,!?;:()]/g, ' ')
+      .replace(/\s+/g, '_')
+      .trim();
+
+    // Take first 30 chars
+    const snippet = cleanText.slice(0, 30).replace(/^_+|_+$/g, '');
+    if (snippet.length > 0) {
+      cleanTitle = `AetherVocal_${snippet}`;
+    }
+  }
+
+  // Remove any remaining characters illegal in OS filenames (\ / : * ? " < > |)
+  cleanTitle = cleanTitle.replace(/[\\/:*?"<>|]/g, '_').replace(/_+/g, '_');
+  const safeTag = tag ? `_${tag}` : '';
+  const cleanExt = ext.startsWith('.') ? ext : `.${ext}`;
+
+  return `${cleanTitle}${safeTag}${cleanExt}`;
+}
+
+
+/**
  * Counts detected timestamps in the text.
  */
 export function countTimestamps(text) {

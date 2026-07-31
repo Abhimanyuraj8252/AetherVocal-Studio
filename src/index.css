@@ -2046,6 +2046,109 @@ body {
   white-space: nowrap;
 }
 
+/* ─── Compression Progress Banner ─── */
+
+.compression-progress-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.35rem 0.85rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  backdrop-filter: blur(12px);
+  animation: queueBadgePulse 1.5s ease-in-out infinite;
+}
+
+.compression-progress-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #34d399;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Compression Result Toast Card ─── */
+
+.compression-result-card {
+  width: 100%;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(6, 182, 212, 0.12) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  margin-bottom: 0.5rem;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.18), inset 0 0 12px rgba(16, 185, 129, 0.08);
+  animation: resultToastSlide 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes resultToastSlide {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.compression-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.compression-result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.compression-filename {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  font-family: var(--font-main);
+}
+
+.compression-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.compression-size-old {
+  color: #94a3b8;
+  text-decoration: line-through;
+  font-weight: 500;
+}
+
+.compression-arrow {
+  color: #34d399;
+  font-weight: 700;
+}
+
+.compression-size-new {
+  color: #34d399;
+  font-weight: 700;
+}
+
+.compression-saved-pill {
+  background: rgba(16, 185, 129, 0.25);
+  color: #a7f3d0;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.62rem;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+
+
 /* ═══════════════════════════════════════════════════
    LIGHT THEME OVERRIDES — NEW COMPONENTS
    ═══════════════════════════════════════════════════ */

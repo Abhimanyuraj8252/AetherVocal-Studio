@@ -15,6 +15,7 @@ import { CloudSpeechSynthesizer } from './utils/CloudSpeechSynthesizer';
 import { AudioDB } from './utils/audioDB';
 import { mixAudioBlobWithBGM } from './utils/ambientSoundscapes';
 import { AudioCompressor } from './utils/audioCompressor';
+import { generateSafeFilename } from './utils/textSanitizer';
 
 export default function App() {
   const [theme, setTheme] = useState('dark');
@@ -44,6 +45,7 @@ export default function App() {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, percent: 0, statusText: '' });
   const [downloadError, setDownloadError] = useState('');
   const [lastGeneratedChunkIndex, setLastGeneratedChunkIndex] = useState(0);
+  const [compressionReport, setCompressionReport] = useState(null);
 
   // Auto-Queue Batch Generation State
   const [autoGenerateAll, setAutoGenerateAll] = useState(false);
@@ -235,7 +237,7 @@ export default function App() {
     }
   }, []);
 
-  // ─── DOWNLOAD SINGLE CHUNK (WITH COMPRESSION) ───
+  // ─── DOWNLOAD SINGLE CHUNK (WITH COMPRESSION & SCRIPT FILENAME) ───
   const handleDownloadSingleChunk = useCallback(async (chunkText, index) => {
     if (isGenerating) return;
     setIsGenerating(true);
@@ -251,7 +253,9 @@ export default function App() {
           wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
         }
 
-        // Smart compression based on selected format
+        const rawSize = wavBlob.size;
+        // Smart compression based on selected format with status progress
+        setGenerationProgress({ current: index + 1, total: chunks.length, percent: 85, statusText: '⚡ Compressing chunk audio...' });
         let downloadBlob = wavBlob;
         let ext = 'wav';
         if (selectedFormat === 'webm') {
@@ -261,8 +265,18 @@ export default function App() {
           downloadBlob = await AudioCompressor.compressWavBlob(wavBlob, { targetSampleRate: 22050, mono: true });
         }
 
+        const filename = generateSafeFilename(chunkText, `Chunk_${index + 1}`, ext);
         MobileSafeAudioExporter.resumeAudioContext();
-        MobileSafeAudioExporter.download(downloadBlob, `AetherVocal_Chunk_${index + 1}.${ext}`);
+        MobileSafeAudioExporter.download(downloadBlob, filename);
+
+        const stats = AudioCompressor.getCompressionStats(rawSize, downloadBlob.size);
+        setCompressionReport({
+          filename,
+          originalFormatted: stats.originalFormatted,
+          compressedFormatted: stats.compressedFormatted,
+          reductionPercent: stats.reductionPercent,
+          format: ext.toUpperCase()
+        });
       }
     } catch (err) {
       console.warn('Chunk download error:', err);
@@ -270,7 +284,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [targetLang, pitch, rate, isGenerating, selectedBgm, bgmVolume, selectedFormat]);
+  }, [targetLang, pitch, rate, isGenerating, selectedBgm, bgmVolume, selectedFormat, chunks.length]);
 
   // ─── DOWNLOAD: BLOCK GENERATION (WITH AUTO-QUEUE & COMPRESSION) ───
   const handleGenerateBlock = useCallback(async () => {
@@ -308,12 +322,12 @@ export default function App() {
 
       // Mix BGM Soundscape if enabled
       if (selectedBgm !== 'none') {
-        setGenerationProgress({ current: 0, total: 100, percent: 99, statusText: 'Blending BGM soundscape into audio...' });
+        setGenerationProgress({ current: 0, total: 100, percent: 95, statusText: 'Blending BGM soundscape into audio...' });
         wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
       }
 
       // Smart compression before saving — reduces IndexedDB storage
-      setGenerationProgress(prev => ({ ...prev, statusText: `Compressing Part ${partNum}...` }));
+      setGenerationProgress(prev => ({ ...prev, percent: 98, statusText: `⚡ Compressing Part ${partNum} Audio...` }));
       wavBlob = await AudioCompressor.compressWavBlob(wavBlob, { targetSampleRate: 22050, mono: true });
 
       // Save to IndexedDB
@@ -386,7 +400,7 @@ export default function App() {
     if (selectedIds.length === 0) return;
     setIsGenerating(true);
     setDownloadError('');
-    setGenerationProgress({ current: 0, total: 100, percent: 0, statusText: 'Fetching parts from database...' });
+    setGenerationProgress({ current: 0, total: 100, percent: 10, statusText: 'Fetching parts from database...' });
 
     try {
       const blobsToCombine = [];
@@ -404,11 +418,12 @@ export default function App() {
       if (blobsToCombine.length === 0) throw new Error("No audio data found to combine.");
 
       const combinedBlob = await CloudSpeechSynthesizer.combineSavedBlobs(blobsToCombine, (prog) => {
-        setGenerationProgress({ current: 0, total: 100, percent: 50, statusText: prog.statusText });
+        setGenerationProgress({ current: 0, total: 100, percent: 60, statusText: prog.statusText });
       });
 
-      // Smart compression on combined download
-      setGenerationProgress({ current: 0, total: 100, percent: 80, statusText: 'Compressing combined audio...' });
+      const rawSize = combinedBlob.size;
+      // Smart compression on combined download with live feedback
+      setGenerationProgress({ current: 0, total: 100, percent: 85, statusText: '⚡ Compressing combined audio...' });
       let downloadBlob;
       let ext;
       if (selectedFormat === 'webm') {
@@ -419,10 +434,20 @@ export default function App() {
         ext = 'wav';
       }
 
-      const filename = `AetherVocal_Combined_${Date.now()}.${ext}`;
+      const tag = selectedIds.length > 1 ? 'Combined' : 'Part';
+      const filename = generateSafeFilename(text, tag, ext);
 
       MobileSafeAudioExporter.resumeAudioContext();
       MobileSafeAudioExporter.download(downloadBlob, filename);
+
+      const stats = AudioCompressor.getCompressionStats(rawSize, downloadBlob.size);
+      setCompressionReport({
+        filename,
+        originalFormatted: stats.originalFormatted,
+        compressedFormatted: stats.compressedFormatted,
+        reductionPercent: stats.reductionPercent,
+        format: ext.toUpperCase()
+      });
 
     } catch (err) {
       setDownloadError("Combine failed: " + err.message);
@@ -430,9 +455,10 @@ export default function App() {
       setIsGenerating(false);
       setGenerationProgress({ current: 0, total: 0, percent: 0, statusText: '' });
     }
-  }, [audioHistory, selectedFormat]);
+  }, [audioHistory, selectedFormat, text]);
 
   const handleDismissError = useCallback(() => setDownloadError(''), []);
+  const handleDismissCompressionReport = useCallback(() => setCompressionReport(null), []);
 
   // ─── AUTO-QUEUE HANDLERS ───
   const handleAutoGenerateAll = useCallback(() => {
@@ -559,6 +585,8 @@ export default function App() {
         onCancelAutoQueue={handleCancelAutoQueue}
         totalParts={Math.ceil(chunks.length / 20)}
         currentPartNumber={Math.floor(lastGeneratedChunkIndex / 20) + 1}
+        compressionReport={compressionReport}
+        onDismissCompressionReport={handleDismissCompressionReport}
       />
     </div>
   );

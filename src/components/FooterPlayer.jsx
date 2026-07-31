@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, Download, Loader2, X, AlertTriangle, Zap, XCircle, Layers } from 'lucide-react';
+import { Play, Pause, Square, Download, Loader2, X, AlertTriangle, Zap, XCircle, Layers, Sparkles } from 'lucide-react';
 
 export function FooterPlayer({
   isSpeaking,
@@ -23,11 +23,46 @@ export function FooterPlayer({
   autoQueueActive,
   onCancelAutoQueue,
   totalParts,
-  currentPartNumber
+  currentPartNumber,
+  compressionReport,
+  onDismissCompressionReport
 }) {
   return (
     <footer className="sticky-player-bar">
       <div className="player-bar-container">
+        {/* Compression Result Toast / Banner */}
+        {compressionReport && (
+          <div className="compression-result-card">
+            <div className="compression-result-header">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse flex-shrink-0" />
+                <span className="font-semibold text-xs text-emerald-300">
+                  ⚡ Smart Compression Complete
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onDismissCompressionReport}
+                className="text-slate-400 hover:text-white transition-colors"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="compression-result-body">
+              <span className="compression-filename">{compressionReport.filename}</span>
+              <div className="compression-stats-row">
+                <span className="compression-size-old">{compressionReport.originalFormatted}</span>
+                <span className="compression-arrow">➔</span>
+                <span className="compression-size-new">{compressionReport.compressedFormatted}</span>
+                <span className="compression-saved-pill">
+                  🎉 {compressionReport.reductionPercent}% Saved ({compressionReport.format})
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Download Error Banner */}
         {downloadError && (
           <div className="download-error-banner">
@@ -117,6 +152,15 @@ export function FooterPlayer({
           </div>
         )}
 
+        {/* Compression Progress Banner */}
+        {isGenerating && generationProgress?.statusText && generationProgress.statusText.includes('Compressing') && (
+          <div className="compression-progress-banner">
+            <Zap className="w-4 h-4 text-emerald-400 animate-bounce flex-shrink-0" />
+            <span className="compression-progress-text">{generationProgress.statusText}</span>
+            <span className="compression-badge">Smart Compressor Active</span>
+          </div>
+        )}
+
         {/* Player Controls */}
         <div className="player-primary-actions">
           {!isSpeaking || isPaused ? (
@@ -171,10 +215,10 @@ export function FooterPlayer({
                   <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
                   <span>
                     {generationProgress?.statusText
-                      ? (generationProgress.total > 1
+                      ? generationProgress.statusText
+                      : (generationProgress?.total > 1
                           ? `Chunk ${generationProgress.current}/${generationProgress.total} (${generationProgress.percent}%)`
-                          : 'Generating...')
-                      : 'Generating Block...'}
+                          : 'Generating...')}
                   </span>
                 </>
               ) : (
