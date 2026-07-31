@@ -1795,4 +1795,345 @@ body {
 }
 
 
+/* ═══════════════════════════════════════════════════
+   AUTO-QUEUE & BATCH GENERATION CONTROLS
+   ═══════════════════════════════════════════════════ */
+
+.auto-queue-section {
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+}
+
+.auto-queue-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  background: rgba(15, 22, 38, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.auto-queue-toggle:hover {
+  border-color: var(--border-highlight);
+  background: rgba(22, 32, 54, 0.8);
+}
+
+.auto-queue-toggle.active {
+  border-color: rgba(99, 102, 241, 0.6);
+  background: rgba(99, 102, 241, 0.12);
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.2), inset 0 0 12px rgba(99, 102, 241, 0.06);
+}
+
+.auto-queue-toggle-track {
+  width: 32px;
+  height: 18px;
+  border-radius: 10px;
+  background: rgba(71, 85, 105, 0.5);
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  transition: background 0.3s ease;
+  flex-shrink: 0;
+}
+
+.auto-queue-toggle.active .auto-queue-toggle-track {
+  background: linear-gradient(135deg, var(--primary-accent), var(--cyan-accent));
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+.auto-queue-toggle-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(203, 213, 225, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+  transform: translateX(0);
+}
+
+.auto-queue-toggle.active .auto-queue-toggle-thumb {
+  transform: translateX(14px);
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+}
+
+.auto-queue-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-family: var(--font-main);
+  letter-spacing: 0.01em;
+}
+
+.auto-queue-toggle.active .auto-queue-label {
+  color: var(--primary-accent);
+}
+
+.auto-queue-badge-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  white-space: nowrap;
+  animation: queueBadgePulse 2s ease-in-out infinite;
+}
+
+.auto-queue-pulse-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary-accent);
+  animation: queueDotPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes queueBadgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.15); }
+  50% { box-shadow: 0 0 12px 2px rgba(99, 102, 241, 0.25); }
+}
+
+@keyframes queueDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
+/* ─── Batch Progress Bar ─── */
+
+.batch-progress-container {
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.batch-progress-outer {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(30, 41, 59, 0.8);
+  overflow: hidden;
+}
+
+.batch-progress-parts-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.35), rgba(139, 92, 246, 0.35));
+  transition: width 0.5s ease;
+}
+
+.batch-progress-chunk-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--primary-accent), var(--cyan-accent));
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+  transition: width 0.3s ease, left 0.5s ease;
+  animation: chunkFillShimmer 2s ease-in-out infinite;
+}
+
+@keyframes chunkFillShimmer {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+}
+
+.batch-progress-text {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  font-family: var(--font-main);
+  letter-spacing: 0.02em;
+}
+
+/* ─── Cancel Queue Button ─── */
+
+.btn-cancel-queue {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(236, 72, 153, 0.2)) !important;
+  color: #fb7185 !important;
+  border: 1px solid rgba(244, 63, 94, 0.35) !important;
+  transition: all 0.25s ease;
+}
+
+.btn-cancel-queue:hover {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.3), rgba(236, 72, 153, 0.3)) !important;
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.25);
+  border-color: rgba(244, 63, 94, 0.5) !important;
+}
+
+/* ═══════════════════════════════════════════════════
+   DUAL-STATE VISUALIZER BADGES
+   ═══════════════════════════════════════════════════ */
+
+.dual-status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.status-badge.status-generating {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  font-size: 0.6rem;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  animation: queueBadgePulse 2s ease-in-out infinite;
+}
+
+.status-badge.status-playing {
+  background: rgba(6, 182, 212, 0.15);
+  color: #67e8f9;
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  font-size: 0.6rem;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.status-badge.status-recording {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  font-size: 0.6rem;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+  animation: queueBadgePulse 1.5s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════
+   COMPRESSION BADGE
+   ═══════════════════════════════════════════════════ */
+
+.compression-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.55rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--emerald-accent);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES — NEW COMPONENTS
+   ═══════════════════════════════════════════════════ */
+
+[data-theme="light"] .auto-queue-toggle {
+  background: rgba(241, 245, 249, 0.9);
+  border-color: rgba(203, 213, 225, 0.6);
+}
+
+[data-theme="light"] .auto-queue-toggle:hover {
+  background: rgba(226, 232, 240, 0.95);
+  border-color: rgba(79, 70, 229, 0.4);
+}
+
+[data-theme="light"] .auto-queue-toggle.active {
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(79, 70, 229, 0.5);
+}
+
+[data-theme="light"] .auto-queue-toggle.active .auto-queue-label {
+  color: var(--primary-accent);
+}
+
+[data-theme="light"] .auto-queue-label {
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .auto-queue-toggle-track {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+[data-theme="light"] .auto-queue-badge-active {
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--primary-accent);
+  border-color: rgba(79, 70, 229, 0.25);
+}
+
+[data-theme="light"] .batch-progress-outer {
+  background: rgba(226, 232, 240, 0.8);
+}
+
+[data-theme="light"] .batch-progress-text {
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .btn-cancel-queue {
+  background: rgba(244, 63, 94, 0.08) !important;
+  color: #e11d48 !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+[data-theme="light"] .status-badge.status-generating {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--primary-accent);
+  border-color: rgba(79, 70, 229, 0.25);
+}
+
+[data-theme="light"] .status-badge.status-playing {
+  background: rgba(2, 132, 199, 0.08);
+  color: var(--cyan-accent);
+  border-color: rgba(2, 132, 199, 0.25);
+}
+
+[data-theme="light"] .compression-badge {
+  background: rgba(5, 150, 105, 0.08);
+  color: var(--emerald-accent);
+  border-color: rgba(5, 150, 105, 0.2);
+}
+
+/* ─── Responsive: Stack auto-queue on small screens ─── */
+
+@media (max-width: 640px) {
+  .auto-queue-section {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .auto-queue-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .batch-progress-container {
+    padding: 0.25rem 0;
+  }
+
+  .dual-status-row {
+    gap: 4px;
+  }
+}
 

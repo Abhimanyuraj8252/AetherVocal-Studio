@@ -14,6 +14,7 @@ import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
 import { CloudSpeechSynthesizer } from './utils/CloudSpeechSynthesizer';
 import { AudioDB } from './utils/audioDB';
 import { mixAudioBlobWithBGM } from './utils/ambientSoundscapes';
+import { AudioCompressor } from './utils/audioCompressor';
 
 export default function App() {
   const [theme, setTheme] = useState('dark');
@@ -43,6 +44,11 @@ export default function App() {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, percent: 0, statusText: '' });
   const [downloadError, setDownloadError] = useState('');
   const [lastGeneratedChunkIndex, setLastGeneratedChunkIndex] = useState(0);
+
+  // Auto-Queue Batch Generation State
+  const [autoGenerateAll, setAutoGenerateAll] = useState(false);
+  const [autoQueueActive, setAutoQueueActive] = useState(false);
+  const autoGenerateRef = useRef(false); // Ref to track cancel in async chain
 
   // Audio History Log
   const [audioHistory, setAudioHistory] = useState(() => {
@@ -138,7 +144,7 @@ export default function App() {
     setActiveChunkIndex(-1);
   };
 
-  // ─── PLAY FULL SPEECH (PREVIEW ONLY) ───
+  // ─── PLAY FULL SPEECH (PREVIEW ONLY — NON-BLOCKING) ───
   const handlePlayFullSpeech = useCallback(async () => {
     if (!text.trim()) return;
 
@@ -150,7 +156,7 @@ export default function App() {
     }
 
     stopAudio();
-    setIsGenerating(true);
+    // NOTE: We do NOT set isGenerating here — preview is non-blocking
 
     try {
       let { wavBlob } = await CloudSpeechSynthesizer.synthesize(text, {
@@ -159,14 +165,12 @@ export default function App() {
         rate: rate,
         startIndex: 0,
         maxChunks: 20, // Preview only first 20 chunks to avoid timeout
-        onProgress: (progress) => setGenerationProgress(progress)
       });
 
       if (!wavBlob) throw new Error('Audio generation failed.');
 
       // Mix BGM Soundscape if enabled
       if (selectedBgm !== 'none') {
-        setGenerationProgress({ current: 0, total: 100, percent: 99, statusText: 'Mixing ambient BGM soundscape...' });
         wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
       }
 
@@ -174,8 +178,6 @@ export default function App() {
       await playBlob(wavBlob);
     } catch (e) {
       setDownloadError(e.message || "Failed to preview.");
-    } finally {
-      setIsGenerating(false);
     }
   }, [text, isPaused, targetLang, pitch, rate, selectedBgm, bgmVolume]);
 
@@ -188,11 +190,11 @@ export default function App() {
     }
   }, [isSpeaking]);
 
-  // ─── PLAY SINGLE CHUNK ───
+  // ─── PLAY SINGLE CHUNK (NON-BLOCKING) ───
   const handlePlaySingleChunk = useCallback(async (chunkText, index) => {
     stopAudio();
     setActiveChunkIndex(index);
-    setIsGenerating(true);
+    // NOTE: We do NOT set isGenerating here — chunk preview is non-blocking
     try {
       let { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
@@ -210,16 +212,14 @@ export default function App() {
       }
     } catch (e) {
       setActiveChunkIndex(-1);
-    } finally {
-      setIsGenerating(false);
     }
   }, [targetLang, pitch, rate, selectedBgm, bgmVolume]);
 
-  // ─── PLAY SAMPLE ───
+  // ─── PLAY SAMPLE (NON-BLOCKING) ───
   const handlePlaySample = useCallback(async (profile) => {
     stopAudio();
     setIsPlayingSample(true);
-    setIsGenerating(true);
+    // NOTE: We do NOT set isGenerating here — sample playback is non-blocking
     const sample = profile.sampleText || 'AetherVocal Studio Speech Synthesis';
     try {
       const { wavBlob } = await CloudSpeechSynthesizer.synthesize(sample, { 
@@ -232,12 +232,10 @@ export default function App() {
       }
     } catch (e) {
       setIsPlayingSample(false);
-    } finally {
-      setIsGenerating(false);
     }
   }, []);
 
-  // ─── DOWNLOAD SINGLE CHUNK ───
+  // ─── DOWNLOAD SINGLE CHUNK (WITH COMPRESSION) ───
   const handleDownloadSingleChunk = useCallback(async (chunkText, index) => {
     if (isGenerating) return;
     setIsGenerating(true);
@@ -252,8 +250,19 @@ export default function App() {
         if (selectedBgm !== 'none') {
           wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
         }
+
+        // Smart compression based on selected format
+        let downloadBlob = wavBlob;
+        let ext = 'wav';
+        if (selectedFormat === 'webm') {
+          downloadBlob = await AudioCompressor.encodeToCompressedFormat(wavBlob);
+          ext = 'mp3';
+        } else {
+          downloadBlob = await AudioCompressor.compressWavBlob(wavBlob, { targetSampleRate: 22050, mono: true });
+        }
+
         MobileSafeAudioExporter.resumeAudioContext();
-        MobileSafeAudioExporter.download(wavBlob, `AetherVocal_Chunk_${index + 1}.wav`);
+        MobileSafeAudioExporter.download(downloadBlob, `AetherVocal_Chunk_${index + 1}.${ext}`);
       }
     } catch (err) {
       console.warn('Chunk download error:', err);
@@ -261,15 +270,18 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [targetLang, pitch, rate, isGenerating, selectedBgm, bgmVolume]);
+  }, [targetLang, pitch, rate, isGenerating, selectedBgm, bgmVolume, selectedFormat]);
 
-  // ─── DOWNLOAD: BLOCK GENERATION ───
+  // ─── DOWNLOAD: BLOCK GENERATION (WITH AUTO-QUEUE & COMPRESSION) ───
   const handleGenerateBlock = useCallback(async () => {
     if (!text.trim() || isGenerating) return;
 
-    stopAudio();
+    // NOTE: We do NOT call stopAudio() — generation is non-blocking for playback
     setIsGenerating(true);
     setDownloadError('');
+
+    const totalParts = Math.ceil(chunks.length / 20);
+    const partNum = Math.floor(lastGeneratedChunkIndex / 20) + 1;
 
     try {
       let { wavBlob, endIndex, isComplete } = await CloudSpeechSynthesizer.synthesize(text, {
@@ -279,7 +291,14 @@ export default function App() {
         startIndex: lastGeneratedChunkIndex,
         maxChunks: 20, // Strict API limit per block
         onProgress: (progress) => {
-          setGenerationProgress(progress);
+          setGenerationProgress({
+            ...progress,
+            partNumber: partNum,
+            totalParts: totalParts,
+            statusText: autoGenerateRef.current
+              ? `Part ${partNum} of ${totalParts} • Chunk ${progress.current}/${progress.total}`
+              : progress.statusText
+          });
         }
       });
 
@@ -293,11 +312,14 @@ export default function App() {
         wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
       }
 
+      // Smart compression before saving — reduces IndexedDB storage
+      setGenerationProgress(prev => ({ ...prev, statusText: `Compressing Part ${partNum}...` }));
+      wavBlob = await AudioCompressor.compressWavBlob(wavBlob, { targetSampleRate: 22050, mono: true });
+
       // Save to IndexedDB
       const dbId = `audio_blob_${Date.now()}`;
       await AudioDB.saveAudioBlob(dbId, wavBlob);
 
-      const partNum = Math.floor(lastGeneratedChunkIndex / 20) + 1;
       const historyItem = {
         id: dbId,
         title: `Part ${partNum}: ` + text.slice(lastGeneratedChunkIndex * 50, (lastGeneratedChunkIndex * 50) + 40) + '...',
@@ -316,16 +338,25 @@ export default function App() {
       setLastGeneratedChunkIndex(endIndex);
 
       if (isComplete) {
+        setAutoQueueActive(false);
+        autoGenerateRef.current = false;
         setDownloadError("Generation complete. Select parts in History to Combine & Download!");
+      } else if (autoGenerateRef.current) {
+        // Auto-queue: schedule next part after a brief UI update delay
+        setIsGenerating(false);
+        setTimeout(() => handleGenerateBlock(), 800);
+        return; // Don't hit the finally block's setIsGenerating(false) yet
       }
 
     } catch (err) {
       console.warn('Audio download error:', err);
       setDownloadError(err?.message || 'Audio generate nahi ho saka. Kripya punah prayas karein.');
+      setAutoQueueActive(false);
+      autoGenerateRef.current = false;
     } finally {
       setIsGenerating(false);
     }
-  }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume]);
+  }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume, chunks.length]);
 
   // ─── HISTORY ACTIONS ───
   const handleClearHistory = useCallback(async () => {
@@ -339,7 +370,7 @@ export default function App() {
   const handlePlayHistoryItem = useCallback(async (item) => {
     if (!item.dbId) return;
     stopAudio();
-    setIsGenerating(true);
+    // NOTE: We do NOT set isGenerating here — history playback is non-blocking
     try {
       const blob = await AudioDB.getAudioBlob(item.dbId);
       if (blob) {
@@ -348,8 +379,6 @@ export default function App() {
       }
     } catch (e) {
       console.warn("Could not load history audio");
-    } finally {
-      setIsGenerating(false);
     }
   }, []);
 
@@ -378,11 +407,22 @@ export default function App() {
         setGenerationProgress({ current: 0, total: 100, percent: 50, statusText: prog.statusText });
       });
 
-      const ext = selectedFormat === 'webm' ? 'mp3' : 'wav';
+      // Smart compression on combined download
+      setGenerationProgress({ current: 0, total: 100, percent: 80, statusText: 'Compressing combined audio...' });
+      let downloadBlob;
+      let ext;
+      if (selectedFormat === 'webm') {
+        downloadBlob = await AudioCompressor.encodeToCompressedFormat(combinedBlob);
+        ext = 'mp3';
+      } else {
+        downloadBlob = await AudioCompressor.compressWavBlob(combinedBlob, { targetSampleRate: 22050, mono: true });
+        ext = 'wav';
+      }
+
       const filename = `AetherVocal_Combined_${Date.now()}.${ext}`;
 
       MobileSafeAudioExporter.resumeAudioContext();
-      MobileSafeAudioExporter.download(combinedBlob, filename);
+      MobileSafeAudioExporter.download(downloadBlob, filename);
 
     } catch (err) {
       setDownloadError("Combine failed: " + err.message);
@@ -393,6 +433,27 @@ export default function App() {
   }, [audioHistory, selectedFormat]);
 
   const handleDismissError = useCallback(() => setDownloadError(''), []);
+
+  // ─── AUTO-QUEUE HANDLERS ───
+  const handleAutoGenerateAll = useCallback(() => {
+    if (isGenerating) return;
+    setAutoGenerateAll(true);
+    setAutoQueueActive(true);
+    autoGenerateRef.current = true;
+    // Trigger the first block — the chain will continue via handleGenerateBlock
+    setTimeout(() => handleGenerateBlock(), 100);
+  }, [isGenerating, handleGenerateBlock]);
+
+  const handleCancelAutoQueue = useCallback(() => {
+    setAutoGenerateAll(false);
+    setAutoQueueActive(false);
+    autoGenerateRef.current = false;
+    // Current block will finish, but no next block will be triggered
+  }, []);
+
+  const handleToggleAutoGenerate = useCallback(() => {
+    setAutoGenerateAll(prev => !prev);
+  }, []);
 
   // Stats calculation
   const charCount = text.length;
@@ -467,7 +528,10 @@ export default function App() {
               setReverbPreset={setReverbPreset}
             />
 
-            <AudioVisualizer isSpeaking={isSpeaking || isPlayingSample || isGenerating} />
+            <AudioVisualizer
+              isSpeaking={isSpeaking || isPlayingSample}
+              isGenerating={isGenerating}
+            />
           </div>
         </div>
       </main>
@@ -481,7 +545,7 @@ export default function App() {
         onPlay={handlePlayFullSpeech}
         onPause={handlePause}
         onStop={stopAudio}
-        onDownload={handleGenerateBlock}
+        onDownload={autoGenerateAll && !autoQueueActive ? handleAutoGenerateAll : handleGenerateBlock}
         onDismissError={handleDismissError}
         selectedFormat={selectedFormat}
         setSelectedFormat={setSelectedFormat}
@@ -489,6 +553,12 @@ export default function App() {
         isComplete={lastGeneratedChunkIndex >= chunks.length && chunks.length > 0}
         nextChunkIndex={lastGeneratedChunkIndex}
         totalChunks={chunks.length}
+        autoGenerateAll={autoGenerateAll}
+        onToggleAutoGenerate={handleToggleAutoGenerate}
+        autoQueueActive={autoQueueActive}
+        onCancelAutoQueue={handleCancelAutoQueue}
+        totalParts={Math.ceil(chunks.length / 20)}
+        currentPartNumber={Math.floor(lastGeneratedChunkIndex / 20) + 1}
       />
     </div>
   );

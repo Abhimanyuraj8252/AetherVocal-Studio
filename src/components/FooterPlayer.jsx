@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, Download, Loader2, X, AlertTriangle } from 'lucide-react';
+import { Play, Pause, Square, Download, Loader2, X, AlertTriangle, Zap, XCircle, Layers } from 'lucide-react';
 
 export function FooterPlayer({
   isSpeaking,
@@ -17,7 +17,13 @@ export function FooterPlayer({
   stats,
   isComplete,
   nextChunkIndex,
-  totalChunks
+  totalChunks,
+  autoGenerateAll,
+  onToggleAutoGenerate,
+  autoQueueActive,
+  onCancelAutoQueue,
+  totalParts,
+  currentPartNumber
 }) {
   return (
     <footer className="sticky-player-bar">
@@ -59,6 +65,58 @@ export function FooterPlayer({
           </div>
         </div>
 
+        {/* Auto-Queue Toggle */}
+        <div className="auto-queue-section">
+          <div
+            className={`auto-queue-toggle ${autoGenerateAll ? 'active' : ''}`}
+            onClick={onToggleAutoGenerate}
+            role="switch"
+            aria-checked={autoGenerateAll}
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleAutoGenerate(); } }}
+          >
+            <div className="auto-queue-toggle-track">
+              <div className="auto-queue-toggle-thumb">
+                {autoGenerateAll && <Zap className="w-2.5 h-2.5" style={{ color: '#070a12' }} />}
+              </div>
+            </div>
+            <span className="auto-queue-label">
+              {autoQueueActive ? 'Auto-Queue Active' : 'Auto-Queue All Parts'}
+            </span>
+            {autoQueueActive && (
+              <span className="auto-queue-badge-active">
+                <span className="auto-queue-pulse-dot" />
+                Part {currentPartNumber}/{totalParts}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Batch Progress Bar */}
+        {autoQueueActive && isGenerating && (
+          <div className="batch-progress-container">
+            <div className="batch-progress-outer">
+              <div
+                className="batch-progress-parts-fill"
+                style={{ width: `${totalParts > 0 ? ((currentPartNumber - 1) / totalParts) * 100 : 0}%` }}
+              />
+              <div
+                className="batch-progress-chunk-fill"
+                style={{
+                  left: `${totalParts > 0 ? ((currentPartNumber - 1) / totalParts) * 100 : 0}%`,
+                  width: `${totalParts > 0 ? ((generationProgress?.percent || 0) / 100) * (100 / totalParts) : 0}%`
+                }}
+              />
+            </div>
+            <span className="batch-progress-text">
+              Part {currentPartNumber} of {totalParts}
+              {generationProgress?.total > 1 && (
+                <> • Chunk {generationProgress.current}/{generationProgress.total}</>  
+              )}
+            </span>
+          </div>
+        )}
+
         {/* Player Controls */}
         <div className="player-primary-actions">
           {!isSpeaking || isPaused ? (
@@ -66,7 +124,6 @@ export function FooterPlayer({
               type="button"
               onClick={onPlay}
               className="btn-player btn-play"
-              disabled={isGenerating}
             >
               <Play className="w-4 h-4 fill-current flex-shrink-0" />
               <span>{isPaused ? 'Resume' : 'Play Speech'}</span>
@@ -93,36 +150,47 @@ export function FooterPlayer({
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={onDownload}
-            className={`btn-player ${isComplete ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'btn-download-gradient'}`}
-            disabled={isGenerating || (isComplete && totalChunks > 0)}
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
-                <span>
-                  {generationProgress?.statusText 
-                    ? (generationProgress.total > 1 
-                        ? `Chunk ${generationProgress.current}/${generationProgress.total} (${generationProgress.percent}%)` 
-                        : 'Generating...')
-                    : 'Generating Block...'}
-                </span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4 flex-shrink-0" />
-                <span>
-                  {isComplete 
-                    ? 'All Parts Ready (Combine in History)' 
-                    : nextChunkIndex > 0 
-                      ? `Generate Part ${Math.floor(nextChunkIndex / 20) + 1}` 
-                      : 'Generate Audio (Part 1)'}
-                </span>
-              </>
-            )}
-          </button>
+          {autoQueueActive && isGenerating ? (
+            <button
+              type="button"
+              onClick={onCancelAutoQueue}
+              className="btn-player btn-cancel-queue"
+            >
+              <XCircle className="w-4 h-4 flex-shrink-0" />
+              <span>Cancel Auto-Queue</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onDownload}
+              className={`btn-player ${isComplete ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'btn-download-gradient'}`}
+              disabled={isGenerating || (isComplete && totalChunks > 0)}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
+                  <span>
+                    {generationProgress?.statusText
+                      ? (generationProgress.total > 1
+                          ? `Chunk ${generationProgress.current}/${generationProgress.total} (${generationProgress.percent}%)`
+                          : 'Generating...')
+                      : 'Generating Block...'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 flex-shrink-0" />
+                  <span>
+                    {isComplete
+                      ? 'All Parts Ready (Combine in History)'
+                      : nextChunkIndex > 0
+                        ? `Generate Part ${Math.floor(nextChunkIndex / 20) + 1}`
+                        : 'Generate Audio (Part 1)'}
+                  </span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </footer>

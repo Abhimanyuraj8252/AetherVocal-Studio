@@ -141,7 +141,6 @@ export function AudioHistory({ history = [], onClearHistory, onPlayHistoryItem, 
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onPlayHistoryItem(item); }}
-                  disabled={isGenerating}
                   className="btn-play-chunk-sm"
                   title="Play this part"
                 >

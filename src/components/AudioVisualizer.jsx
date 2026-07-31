@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Activity, Radio, Disc } from 'lucide-react';
+import { Activity, Radio, Disc, Loader2 } from 'lucide-react';
 
-export function AudioVisualizer({ isSpeaking, isRecording, isPlaying }) {
-  const active = isSpeaking || isRecording || isPlaying;
+export function AudioVisualizer({ isSpeaking, isRecording, isPlaying, isGenerating }) {
+  const active = isSpeaking || isRecording || isPlaying || isGenerating;
+  const isPlaybackActive = isSpeaking || isRecording || isPlaying;
+  const isDualMode = isGenerating && isPlaybackActive;
   const canvasRef = useRef(null);
   const [vizMode, setVizMode] = useState('bars'); // 'bars' | 'spectrum' | 'ring'
 
@@ -40,6 +42,23 @@ export function AudioVisualizer({ isSpeaking, isRecording, isPlaying }) {
           else ctx.lineTo(x, y);
         }
         ctx.stroke();
+
+        if (isDualMode) {
+          ctx.beginPath();
+          ctx.lineWidth = 1.5;
+          const genGrad = ctx.createLinearGradient(0, 0, width, 0);
+          genGrad.addColorStop(0, 'rgba(99, 102, 241, 0.6)');
+          genGrad.addColorStop(1, 'rgba(139, 92, 246, 0.6)');
+          ctx.strokeStyle = genGrad;
+          for (let x = 0; x < width; x += 4) {
+            const t = Date.now() * 0.003 + x * 0.04;
+            const amp = Math.sin(t) * 6 + Math.cos(t * 2.5) * 3;
+            const y = centerY + 22 + amp;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
 
       } else if (vizMode === 'ring') {
         // Holographic Pulsing Ring
@@ -108,6 +127,17 @@ export function AudioVisualizer({ isSpeaking, isRecording, isPlaying }) {
           ctx.roundRect(i * (barWidth + 3), centerY - barHeight / 2, barWidth, barHeight, 4);
           ctx.fill();
         }
+
+        // Dual-mode: overlay generation pulse effect
+        if (isDualMode) {
+          const pulseAlpha = 0.15 + Math.sin(Date.now() * 0.004) * 0.1;
+          const pulseGrad = ctx.createLinearGradient(0, 0, width, 0);
+          pulseGrad.addColorStop(0, `rgba(99, 102, 241, ${pulseAlpha})`);
+          pulseGrad.addColorStop(0.5, `rgba(139, 92, 246, ${pulseAlpha})`);
+          pulseGrad.addColorStop(1, `rgba(99, 102, 241, ${pulseAlpha})`);
+          ctx.fillStyle = pulseGrad;
+          ctx.fillRect(0, 0, width, height);
+        }
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -118,24 +148,32 @@ export function AudioVisualizer({ isSpeaking, isRecording, isPlaying }) {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [active, isRecording, vizMode]);
+  }, [active, isRecording, isGenerating, vizMode]);
 
   return (
     <div className="visualizer-container">
       <div className="visualizer-status flex items-center justify-between gap-2 w-full">
-        {isRecording ? (
-          <span className="status-badge status-recording animate-pulse">
-            ● Recording Audio to WAV...
-          </span>
-        ) : active ? (
-          <span className="status-badge status-playing">
-            🔊 Synthesizing & Playing Audio...
-          </span>
-        ) : (
-          <span className="status-badge status-idle">
-            READY
-          </span>
-        )}
+        <div className="dual-status-row">
+          {isGenerating && (
+            <span className="status-badge status-generating">
+              <Loader2 className="w-3 h-3 animate-spin" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '4px' }} />
+              Generating Audio...
+            </span>
+          )}
+          {isRecording && (
+            <span className="status-badge status-recording">
+              ● Recording Audio to WAV...
+            </span>
+          )}
+          {isPlaybackActive && !isRecording && (
+            <span className="status-badge status-playing">
+              🔊 Playing Audio
+            </span>
+          )}
+          {!active && (
+            <span className="status-badge status-idle">READY</span>
+          )}
+        </div>
 
         {/* Mode Selector Buttons */}
         <div className="flex items-center gap-1 bg-slate-900/90 p-1 border border-slate-800 rounded-lg">
