@@ -170,81 +170,90 @@ export function FileUploader({ onTextLoaded, onGenerateAudio, currentTextLength 
             </button>
           </div>
         ) : (
-          <div className="file-active-container">
-            <div className="file-info-header flex items-center justify-between gap-2 min-w-0">
-              <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
-                <div className="file-icon-badge flex-shrink-0">
-                  {uploadedFileInfo.isSubtitle ? (
-                    <FileCode className="w-5 h-5 text-amber-400" />
-                  ) : (
-                    <FileType className="w-5 h-5 text-cyan-400" />
-                  )}
+          <div className="file-active-container min-w-0 w-full overflow-hidden">
+            <div className="file-info-header flex items-center gap-2.5 min-w-0 w-full overflow-hidden">
+              <div className="file-icon-badge flex-shrink-0">
+                {uploadedFileInfo.isSubtitle ? (
+                  <FileCode className="w-5 h-5 text-amber-400" />
+                ) : (
+                  <FileType className="w-5 h-5 text-cyan-400" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="flex items-center gap-1.5 min-w-0 w-full overflow-hidden">
+                  <span 
+                    className="font-semibold text-slate-100 text-sm truncate min-w-0 flex-1 block max-w-full"
+                    style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
+                    title={uploadedFileInfo.name}
+                  >
+                    {uploadedFileInfo.name}
+                  </span>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <span className="file-type-chip">{uploadedFileInfo.type}</span>
+                    {uploadedFileInfo.isSubtitle && (
+                      <span className="file-tag-sub">Subtitles Cleaned</span>
+                    )}
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap min-w-0">
-                    <span className="font-semibold text-slate-100 text-sm truncate block max-w-full" title={uploadedFileInfo.name}>
-                      {uploadedFileInfo.name}
-                    </span>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <span className="file-type-chip">{uploadedFileInfo.type}</span>
-                      {uploadedFileInfo.isSubtitle && (
-                        <span className="file-tag-sub">Subtitles Cleaned</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-xs text-slate-400 flex items-center gap-3 mt-0.5 flex-wrap">
-                    <span>Size: <strong className="text-slate-200">{uploadedFileInfo.size}</strong></span>
-                    <span>Chars: <strong className="text-cyan-400">{uploadedFileInfo.charCount}</strong></span>
-                    <span>Lines: <strong className="text-pink-400">{uploadedFileInfo.lineCount}</strong></span>
-                  </div>
+                <div className="text-xs text-slate-400 flex items-center gap-2 mt-1 flex-wrap min-w-0 overflow-hidden">
+                  <span className="whitespace-nowrap">Size: <strong className="text-slate-200">{uploadedFileInfo.size}</strong></span>
+                  <span className="whitespace-nowrap">Chars: <strong className="text-cyan-400">{uploadedFileInfo.charCount}</strong></span>
+                  <span className="whitespace-nowrap">Lines: <strong className="text-pink-400">{uploadedFileInfo.lineCount}</strong></span>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+            {/* Premium Bottom Actions Bar */}
+            <div className="file-actions-bar flex flex-wrap items-center justify-between gap-2 pt-3 mt-3 border-t border-slate-800/80">
+              {/* Left/Mobile-accessible File Control Buttons */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     fileInputRef.current?.click();
                   }}
-                  className="btn-icon-sm hover:text-cyan-400"
-                  title="Change / Upload another file"
+                  className="btn-file-control btn-file-change flex-1 sm:flex-initial"
+                  title="Change or upload another file"
                 >
-                  <UploadCloud className="w-4 h-4" />
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Change File</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleClearFile();
                   }}
-                  className="btn-icon-sm text-rose-400 hover:bg-rose-500/20"
-                  title="Remove uploaded file info"
+                  className="btn-file-control btn-file-remove flex-1 sm:flex-initial"
+                  title="Remove uploaded file"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Remove</span>
                 </button>
               </div>
-            </div>
 
-            {/* Quick Actions Bar */}
-            <div className="file-actions-bar flex flex-wrap sm:flex-nowrap items-center justify-stretch sm:justify-end gap-2 pt-2 mt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={handleAppendFileText}
-                className="btn-xs btn-outline-cyan w-full sm:w-auto justify-center py-1.5"
-                title="Append file text to existing text in editor"
-              >
-                + Append to Editor
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => onGenerateAudio && onGenerateAudio()}
-                className="btn-xs btn-emerald glow-emerald w-full sm:w-auto justify-center py-1.5 flex items-center gap-1"
-              >
-                <Play className="w-3 h-3 fill-current" />
-                Generate Audio From File
-              </button>
+              {/* Right/Primary Text & Audio Processing Buttons */}
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={handleAppendFileText}
+                  className="btn-file-control btn-file-append flex-1 sm:flex-initial"
+                  title="Append file text to existing text in editor"
+                >
+                  <span>+ Append to Editor</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onGenerateAudio && onGenerateAudio()}
+                  className="btn-file-control btn-file-generate flex-1 sm:flex-initial"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Generate Audio</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
