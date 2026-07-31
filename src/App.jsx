@@ -54,7 +54,9 @@ export default function App() {
   const [autoQueueActive, setAutoQueueActive] = useState(false);
   const autoGenerateRef = useRef(false); // Ref to track cancel in async chain
   const [selectedQueueParts, setSelectedQueueParts] = useState([]);
+  const [generatingPartNum, setGeneratingPartNum] = useState(null);
   const remainingPartsRef = useRef([]);
+  const totalSelectedPartsRef = useRef(0);
 
   // Audio History Log
   const [audioHistory, setAudioHistory] = useState(() => {
@@ -344,8 +346,14 @@ export default function App() {
     }
 
     const startIndex = (partNum - 1) * 20;
+    setGeneratingPartNum(partNum);
 
     try {
+      const totalSelected = totalSelectedPartsRef.current || 1;
+      const completedCount = autoGenerateRef.current 
+        ? Math.max(1, totalSelected - remainingPartsRef.current.length)
+        : partNum;
+
       let { wavBlob, endIndex, isComplete } = await CloudSpeechSynthesizer.synthesize(text, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
@@ -355,10 +363,10 @@ export default function App() {
         onProgress: (progress) => {
           setGenerationProgress({
             ...progress,
-            partNumber: partNum,
-            totalParts: totalParts,
+            partNumber: autoGenerateRef.current ? completedCount : partNum,
+            totalParts: autoGenerateRef.current ? totalSelected : totalParts,
             statusText: autoGenerateRef.current
-              ? `Part ${partNum} of ${totalParts} • Chunk ${progress.current}/${progress.total}`
+              ? `Part ${completedCount} of ${totalSelected} (Part ${partNum}) • Chunk ${progress.current}/${progress.total}`
               : progress.statusText
           });
         }
@@ -430,6 +438,7 @@ export default function App() {
       autoGenerateRef.current = false;
     } finally {
       setIsGenerating(false);
+      setGeneratingPartNum(null);
     }
   }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume, chunks.length, enableCompression, selectedQueueParts]);
 
@@ -538,7 +547,8 @@ export default function App() {
       return;
     }
     const sortedParts = [...selectedQueueParts].sort((a, b) => a - b);
-    remainingPartsRef.current = sortedParts;
+    remainingPartsRef.current = [...sortedParts];
+    totalSelectedPartsRef.current = sortedParts.length;
 
     setAutoGenerateAll(true);
     setAutoQueueActive(true);
@@ -558,8 +568,14 @@ export default function App() {
   }, []);
 
   const handleToggleAutoGenerate = useCallback(() => {
-    setAutoGenerateAll(prev => !prev);
-  }, []);
+    setAutoGenerateAll(prev => {
+      const next = !prev;
+      if (next && !isGenerating && selectedQueueParts.length > 0) {
+        setTimeout(() => handleAutoGenerateAll(), 50);
+      }
+      return next;
+    });
+  }, [isGenerating, selectedQueueParts, handleAutoGenerateAll]);
 
   // Stats calculation
   const charCount = text.length;
@@ -594,6 +610,8 @@ export default function App() {
               chunks={chunks}
               selectedQueueParts={selectedQueueParts}
               setSelectedQueueParts={setSelectedQueueParts}
+              generatingPartNum={generatingPartNum}
+              isGenerating={isGenerating}
             />
 
             <ChunkQueue
@@ -657,7 +675,7 @@ export default function App() {
         onPlay={handlePlayFullSpeech}
         onPause={handlePause}
         onStop={stopAudio}
-        onDownload={autoGenerateAll && !autoQueueActive ? handleAutoGenerateAll : handleGenerateBlock}
+        onDownload={selectedQueueParts.length > 0 || autoGenerateAll ? handleAutoGenerateAll : handleGenerateBlock}
         onDismissError={handleDismissError}
         selectedFormat={selectedFormat}
         setSelectedFormat={setSelectedFormat}
@@ -671,8 +689,9 @@ export default function App() {
         onToggleAutoGenerate={handleToggleAutoGenerate}
         autoQueueActive={autoQueueActive}
         onCancelAutoQueue={handleCancelAutoQueue}
-        totalParts={Math.ceil(chunks.length / 20)}
-        currentPartNumber={Math.floor(lastGeneratedChunkIndex / 20) + 1}
+        totalParts={selectedQueueParts.length > 0 ? (autoQueueActive ? (totalSelectedPartsRef.current || selectedQueueParts.length) : selectedQueueParts.length) : Math.ceil(chunks.length / 20)}
+        currentPartNumber={autoQueueActive && totalSelectedPartsRef.current > 0 ? Math.max(1, totalSelectedPartsRef.current - remainingPartsRef.current.length) : 1}
+        selectedQueuePartsCount={selectedQueueParts.length}
         compressionReport={compressionReport}
         onDismissCompressionReport={handleDismissCompressionReport}
       />

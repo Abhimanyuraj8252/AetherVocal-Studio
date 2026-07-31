@@ -26,6 +26,7 @@ export function FooterPlayer({
   onCancelAutoQueue,
   totalParts,
   currentPartNumber,
+  selectedQueuePartsCount = 0,
   compressionReport,
   onDismissCompressionReport
 }) {
@@ -252,9 +253,11 @@ export function FooterPlayer({
                   <span>
                     {isComplete
                       ? 'All Parts Ready (Combine in History)'
-                      : nextChunkIndex > 0
-                        ? `Generate Part ${Math.floor(nextChunkIndex / 20) + 1}`
-                        : 'Generate Audio (Part 1)'}
+                      : (selectedQueuePartsCount > 0
+                          ? `Generate Selected Parts (${selectedQueuePartsCount})`
+                          : (nextChunkIndex > 0
+                              ? `Generate Part ${Math.floor(nextChunkIndex / 20) + 1}`
+                              : 'Generate Audio (Part 1)'))}
                   </span>
                 </>
               )}
