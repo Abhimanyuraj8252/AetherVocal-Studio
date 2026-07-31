@@ -4,6 +4,7 @@ import { HeroBanner } from './components/HeroBanner';
 import { FeatureCards } from './components/FeatureCards';
 import { TextEditor } from './components/TextEditor';
 import { ChunkQueue } from './components/ChunkQueue';
+import { SpeechPartQueue } from './components/SpeechPartQueue';
 import { VoiceSelector } from './components/VoiceSelector';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { FooterPlayer } from './components/FooterPlayer';
@@ -52,6 +53,8 @@ export default function App() {
   const [autoGenerateAll, setAutoGenerateAll] = useState(false);
   const [autoQueueActive, setAutoQueueActive] = useState(false);
   const autoGenerateRef = useRef(false); // Ref to track cancel in async chain
+  const [selectedQueueParts, setSelectedQueueParts] = useState([]);
+  const remainingPartsRef = useRef([]);
 
   // Audio History Log
   const [audioHistory, setAudioHistory] = useState(() => {
@@ -77,10 +80,18 @@ export default function App() {
     if (!text.trim()) {
       setChunks([]);
       setLastGeneratedChunkIndex(0);
+      setSelectedQueueParts([]);
       return;
     }
     const rawChunks = CloudSpeechSynthesizer.smartChunkText(text, 180);
-    setChunks(rawChunks.length > 0 ? rawChunks : [text.trim()]);
+    const newChunks = rawChunks.length > 0 ? rawChunks : [text.trim()];
+    setChunks(newChunks);
+    
+    // Auto-select all parts initially
+    const totalParts = Math.ceil(newChunks.length / 20);
+    const initialParts = Array.from({ length: totalParts }, (_, i) => i + 1);
+    setSelectedQueueParts(initialParts);
+    
     setLastGeneratedChunkIndex(0); // reset if text completely changes
   }, [text]);
 
@@ -298,14 +309,41 @@ export default function App() {
     setDownloadError('');
 
     const totalParts = Math.ceil(chunks.length / 20);
-    const partNum = Math.floor(lastGeneratedChunkIndex / 20) + 1;
+    let partNum;
+
+    if (autoGenerateRef.current) {
+      if (remainingPartsRef.current.length === 0) {
+        setAutoQueueActive(false);
+        autoGenerateRef.current = false;
+        setIsGenerating(false);
+        setDownloadError("Generation complete. Select parts in History to Combine & Download!");
+        return;
+      }
+      partNum = remainingPartsRef.current.shift();
+    } else {
+      if (selectedQueueParts.length > 0) {
+        const sorted = [...selectedQueueParts].sort((a, b) => a - b);
+        partNum = sorted[0];
+      } else {
+        partNum = Math.floor(lastGeneratedChunkIndex / 20) + 1;
+      }
+    }
+
+    if (partNum > totalParts) {
+      setAutoQueueActive(false);
+      autoGenerateRef.current = false;
+      setIsGenerating(false);
+      return;
+    }
+
+    const startIndex = (partNum - 1) * 20;
 
     try {
       let { wavBlob, endIndex, isComplete } = await CloudSpeechSynthesizer.synthesize(text, {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate,
-        startIndex: lastGeneratedChunkIndex,
+        startIndex: startIndex,
         maxChunks: 20, // Strict API limit per block
         onProgress: (progress) => {
           setGenerationProgress({
@@ -341,12 +379,12 @@ export default function App() {
 
       const historyItem = {
         id: dbId,
-        title: `Part ${partNum}: ` + text.slice(lastGeneratedChunkIndex * 50, (lastGeneratedChunkIndex * 50) + 40) + '...',
+        title: `Part ${partNum}: ` + text.slice(startIndex * 50, (startIndex * 50) + 40) + '...',
         voiceName: selectedProfile?.name || 'Standard Voice',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         format: 'WAV',
         dbId: dbId,
-        chunksRange: `${lastGeneratedChunkIndex + 1} - ${endIndex}`,
+        chunksRange: `${startIndex + 1} - ${endIndex}`,
         isPart: true
       };
 
@@ -355,18 +393,27 @@ export default function App() {
       localStorage.setItem('aethervocal_audio_history', JSON.stringify(updatedHistory));
 
       setLastGeneratedChunkIndex(endIndex);
+      
+      // Uncheck the part from queue
+      setSelectedQueueParts(prev => prev.filter(p => p !== partNum));
 
-      if (isComplete) {
-        setAutoQueueActive(false);
-        autoGenerateRef.current = false;
-        setDownloadError("Generation complete. Select parts in History to Combine & Download!");
-      } else if (autoGenerateRef.current) {
-        // Auto-queue: schedule next part after a brief UI update delay
-        setIsGenerating(false);
-        setTimeout(() => {
-          if (generateBlockRef.current) generateBlockRef.current();
-        }, 800);
-        return; // Don't hit the finally block's setIsGenerating(false) yet
+      if (autoGenerateRef.current) {
+        if (remainingPartsRef.current.length === 0) {
+           setAutoQueueActive(false);
+           autoGenerateRef.current = false;
+           setDownloadError("Generation complete. Select parts in History to Combine & Download!");
+        } else {
+           // Auto-queue: schedule next part after a brief UI update delay
+           setIsGenerating(false);
+           setTimeout(() => {
+             if (generateBlockRef.current) generateBlockRef.current();
+           }, 800);
+           return; // Don't hit the finally block's setIsGenerating(false) yet
+        }
+      } else {
+         if (isComplete) {
+            setDownloadError("Generation complete. Select parts in History to Combine & Download!");
+         }
       }
 
     } catch (err) {
@@ -377,7 +424,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume, chunks.length, enableCompression]);
+  }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume, chunks.length, enableCompression, selectedQueueParts]);
 
   // Sync generateBlockRef so setTimeout always uses the latest closure
   useEffect(() => {
@@ -477,14 +524,24 @@ export default function App() {
   // ─── AUTO-QUEUE HANDLERS ───
   const handleAutoGenerateAll = useCallback(() => {
     if (isGenerating) return;
+    
+    // Set up the queue based on selected parts
+    if (selectedQueueParts.length === 0) {
+      setDownloadError("Please select at least one part to generate.");
+      return;
+    }
+    const sortedParts = [...selectedQueueParts].sort((a, b) => a - b);
+    remainingPartsRef.current = sortedParts;
+
     setAutoGenerateAll(true);
     setAutoQueueActive(true);
     autoGenerateRef.current = true;
+    
     // Trigger the first block — the chain will continue via handleGenerateBlock
     setTimeout(() => {
       if (generateBlockRef.current) generateBlockRef.current();
     }, 100);
-  }, [isGenerating]);
+  }, [isGenerating, selectedQueueParts]);
 
   const handleCancelAutoQueue = useCallback(() => {
     setAutoGenerateAll(false);
@@ -526,10 +583,16 @@ export default function App() {
               onGenerateAudio={handleGenerateBlock}
             />
 
+            <SpeechPartQueue
+              chunks={chunks}
+              selectedQueueParts={selectedQueueParts}
+              setSelectedQueueParts={setSelectedQueueParts}
+            />
+
             <ChunkQueue
               chunks={chunks}
               activeChunkIndex={activeChunkIndex}
-              isPlaying={isSpeaking}
+              isPlaying={isSpeaking && !isPaused}
               onPlaySingleChunk={handlePlaySingleChunk}
               onDownloadSingleChunk={handleDownloadSingleChunk}
             />
