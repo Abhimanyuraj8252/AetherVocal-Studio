@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { FileText, Sparkles, Check, Copy, Trash2, Zap, BookOpen, Briefcase, Video } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Sparkles, Check, Copy, Trash2, Zap, BookOpen, Briefcase, Video, UploadCloud, Languages, Clock, RefreshCw, ArrowRight } from 'lucide-react';
+import { FileUploader } from './FileUploader';
+import { stripTimestamps, countTimestamps, sanitizeScript } from '../utils/textSanitizer';
+import { translateScript, SUPPORTED_LANGUAGES } from '../utils/translator';
 
 const SAMPLE_SCRIPTS = [
   {
@@ -35,10 +38,40 @@ export function TextEditor({
   setAutoSanitize,
   stats,
   chunkCount,
-  onSanitize
+  onSanitize,
+  onGenerateAudio
 }) {
-  const [activeTab, setActiveTab] = useState('editor'); // 'editor' | 'preview'
+  const [activeTab, setActiveTab] = useState('editor'); // 'editor' | 'upload' | 'translate' | 'preview'
   const [copied, setCopied] = useState(false);
+
+  // Translation State
+  const [targetLangCode, setTargetLangCode] = useState('hi');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationProgress, setTranslationProgress] = useState(null); // { current, total, percent }
+  const [translateSuccessMsg, setTranslateSuccessMsg] = useState('');
+
+  // Timestamp State
+  const timestampCount = countTimestamps(text);
+
+  // Handle Text Changes & Live Auto-Clean
+  const handleTextChange = (newVal) => {
+    if (autoSanitize) {
+      const cleaned = sanitizeScript(newVal);
+      setText(cleaned);
+    } else {
+      setText(newVal);
+    }
+  };
+
+  // Live sanitize if autoSanitize is toggled ON
+  useEffect(() => {
+    if (autoSanitize && text) {
+      const cleaned = sanitizeScript(text);
+      if (cleaned !== text) {
+        setText(cleaned);
+      }
+    }
+  }, [autoSanitize]);
 
   const handleCopy = () => {
     if (!text) return;
@@ -49,6 +82,59 @@ export function TextEditor({
 
   const handleClear = () => {
     setText('');
+    setTranslateSuccessMsg('');
+  };
+
+  const handleTextLoadedFromFile = (fileContent, mode = 'replace') => {
+    let finalContent = fileContent;
+    if (autoSanitize) {
+      finalContent = sanitizeScript(finalContent);
+    }
+    if (mode === 'append' && text.trim()) {
+      setText(prev => prev.trim() + '\n\n' + finalContent.trim());
+    } else {
+      setText(finalContent);
+    }
+  };
+
+  // Dedicated Timestamp Stripper Handler
+  const handleStripTimestamps = () => {
+    if (!text) return;
+    let stripped = stripTimestamps(text);
+    if (autoSanitize) {
+      stripped = sanitizeScript(stripped);
+    }
+    setText(stripped);
+  };
+
+  // Free Script Translation Handler
+  const handleTranslate = async () => {
+    if (!text.trim() || isTranslating) return;
+    setIsTranslating(true);
+    setTranslateSuccessMsg('');
+    setTranslationProgress({ current: 0, total: 100, percent: 0 });
+
+    try {
+      const translated = await translateScript(text, targetLangCode, (progress) => {
+        setTranslationProgress(progress);
+      });
+
+      let finalTranslated = translated;
+      if (autoSanitize) {
+        finalTranslated = sanitizeScript(finalTranslated);
+      }
+
+      setText(finalTranslated);
+      const selectedLangObj = SUPPORTED_LANGUAGES.find(l => l.code === targetLangCode);
+      setTranslateSuccessMsg(`Script translated successfully to ${selectedLangObj?.name || targetLangCode}!`);
+      setTimeout(() => setTranslateSuccessMsg(''), 4000);
+    } catch (err) {
+      console.error("Translation error:", err);
+      alert("Translation failed. Please check your internet connection.");
+    } finally {
+      setIsTranslating(false);
+      setTranslationProgress(null);
+    }
   };
 
   return (
@@ -57,12 +143,12 @@ export function TextEditor({
         <div className="card-title-group">
           <FileText className="card-icon text-cyan-400" />
           <div>
-            <h3 className="card-title">Text Script & Auto Markdown Stripper</h3>
-            <p className="card-description">Paste script in Hindi or English (Markdown # & * auto-removed)</p>
+            <h3 className="card-title">Text Script, Translator & Cleaner</h3>
+            <p className="card-description">Type/paste script, upload files, strip timestamps & translate instantly</p>
           </div>
         </div>
 
-        {/* Mobile-Optimized Header Actions Row */}
+        {/* Header Navigation Segmented Tabs */}
         <div className="card-header-actions">
           <div className="segmented-control flex-1">
             <button
@@ -71,6 +157,22 @@ export function TextEditor({
               onClick={() => setActiveTab('editor')}
             >
               Editor
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${activeTab === 'upload' ? 'active' : ''}`}
+              onClick={() => setActiveTab('upload')}
+            >
+              <UploadCloud className="w-3.5 h-3.5 inline mr-1 text-cyan-400" />
+              File Upload
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${activeTab === 'translate' ? 'active' : ''}`}
+              onClick={() => setActiveTab('translate')}
+            >
+              <Languages className="w-3.5 h-3.5 inline mr-1 text-pink-400" />
+              Translate
             </button>
             <button
               type="button"
@@ -111,7 +213,10 @@ export function TextEditor({
               key={sample.id}
               type="button"
               className="preset-chip"
-              onClick={() => setText(sample.text)}
+              onClick={() => {
+                handleTextChange(sample.text);
+                setActiveTab('editor');
+              }}
             >
               <span>{sample.label}</span>
             </button>
@@ -119,20 +224,104 @@ export function TextEditor({
         </div>
       </div>
 
+      {/* Translation Toolbar Drawer */}
+      {activeTab === 'translate' && (
+        <div className="translation-drawer-card p-3 my-2 bg-slate-900/80 border border-pink-500/30 rounded-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Languages className="w-5 h-5 text-pink-400" />
+              <div>
+                <h4 className="text-sm font-semibold text-slate-100">Free Instant Translator (No API Key Required)</h4>
+                <p className="text-xs text-slate-400">Translate your script into 10+ languages with full fidelity</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={targetLangCode}
+                onChange={(e) => setTargetLangCode(e.target.value)}
+                disabled={isTranslating}
+                className="select-input-sm"
+              >
+                {SUPPORTED_LANGUAGES.map(lang => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.flag} {lang.name}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleTranslate}
+                disabled={isTranslating || !text.trim()}
+                className="btn-sm btn-pink glow-pink flex items-center gap-1.5"
+              >
+                {isTranslating ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Translating...
+                  </>
+                ) : (
+                  <>
+                    Translate Script <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Translation Progress Bar */}
+          {isTranslating && translationProgress && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-pink-300 mb-1">
+                <span>Translating chunk {translationProgress.current} of {translationProgress.total}...</span>
+                <span>{translationProgress.percent}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-pink-500 to-indigo-500 transition-all duration-300"
+                  style={{ width: `${translationProgress.percent}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {translateSuccessMsg && (
+            <div className="mt-2 text-xs text-emerald-400 flex items-center gap-1">
+              <Check className="w-3.5 h-3.5" /> {translateSuccessMsg}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* File Uploader Tab */}
+      {activeTab === 'upload' && (
+        <div className="my-2">
+          <FileUploader
+            onTextLoaded={handleTextLoadedFromFile}
+            onGenerateAudio={() => {
+              setActiveTab('editor');
+              if (onGenerateAudio) onGenerateAudio();
+            }}
+            currentTextLength={text.length}
+          />
+        </div>
+      )}
+
       {/* Editor / Preview Body */}
-      {activeTab === 'editor' ? (
+      {activeTab === 'editor' || activeTab === 'translate' ? (
         <textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="यहाँ अपना हिन्दी या English टेक्स्ट टाइप करें या पेस्ट करें..."
+          onChange={(e) => handleTextChange(e.target.value)}
+          placeholder="यहाँ अपना हिन्दी या English टेक्स्ट टाइप करें, पेस्ट करें या फ़ाइल अपलोड करें..."
           className="main-textarea"
           rows={6}
         />
-      ) : (
+      ) : activeTab === 'preview' ? (
         <div className="main-textarea overflow-y-auto bg-slate-900/60 p-3 rounded-xl min-h-[140px] text-xs text-slate-200">
-          {text ? text : <span className="text-slate-500 italic">No clean preview text available. Type something in editor...</span>}
+          {text ? text : <span className="text-slate-500 italic">No clean preview text available. Type something or upload a file...</span>}
         </div>
-      )}
+      ) : null}
 
       {/* Editor Footer & Stat Pills Row */}
       <div className="editor-footer">
@@ -151,21 +340,35 @@ export function TextEditor({
           </span>
         </div>
 
-        <div className="flex items-center justify-between gap-2 w-full sm:w-auto">
-          <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
+        <div className="flex items-center justify-between gap-2 w-full sm:w-auto flex-wrap">
+          {/* Timestamp Stripper Action Button */}
+          {timestampCount > 0 && (
+            <button
+              type="button"
+              onClick={handleStripTimestamps}
+              className="btn-xs btn-outline-amber flex items-center gap-1 animate-pulse"
+              title="Remove all YouTube/Podcast timestamps from text"
+            >
+              <Clock className="w-3 h-3 text-amber-400" />
+              Strip Timestamps <span className="badge-amber">{timestampCount}</span>
+            </button>
+          )}
+
+          <label className="flex items-center gap-1.5 text-xs text-slate-300 font-medium cursor-pointer select-none">
             <input
               type="checkbox"
               checked={autoSanitize}
               onChange={(e) => setAutoSanitize(e.target.checked)}
-              className="rounded accent-indigo-500 w-3.5 h-3.5"
+              className="rounded accent-indigo-500 w-3.5 h-3.5 cursor-pointer"
             />
-            Auto Clean
+            Auto Clean Live
           </label>
 
           <button
             type="button"
             onClick={onSanitize}
             className="btn-sm btn-outline-emerald text-xs"
+            title="Clean symbols manually"
           >
             <Sparkles className="w-3 h-3 inline mr-1 text-emerald-400" />
             Clean Symbols
@@ -175,3 +378,5 @@ export function TextEditor({
     </div>
   );
 }
+
+

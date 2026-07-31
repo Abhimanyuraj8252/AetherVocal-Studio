@@ -398,6 +398,7 @@ export default function App() {
               stats={{ charCount, wordCount, formattedDuration }}
               chunkCount={chunks.length}
               onSanitize={handleSanitizeText}
+              onGenerateAudio={handleGenerateBlock}
             />
 
             <ChunkQueue
