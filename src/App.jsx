@@ -13,6 +13,7 @@ import { StudioMixer } from './components/StudioMixer';
 import { PREMIUM_VOICE_PROFILES } from './utils/voiceProfiles';
 import { MobileSafeAudioExporter } from './utils/MobileSafeAudioExporter';
 import { CloudSpeechSynthesizer } from './utils/CloudSpeechSynthesizer';
+import EdgeTTSSynthesizer from './utils/EdgeTTSSynthesizer';
 import { AudioDB } from './utils/audioDB';
 import { mixAudioBlobWithBGM } from './utils/ambientSoundscapes';
 import { AudioCompressor } from './utils/audioCompressor';
@@ -176,13 +177,22 @@ export default function App() {
     // NOTE: We do NOT set isGenerating here — preview is non-blocking
 
     try {
-      let { wavBlob } = await CloudSpeechSynthesizer.synthesize(text, {
+      const synthesizeOptions = {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate,
         startIndex: 0,
         maxChunks: 20, // Preview only first 20 chunks to avoid timeout
-      });
+      };
+      
+      let wavBlob;
+      if (selectedProfile?.engine === 'edge-tts') {
+        const result = await EdgeTTSSynthesizer.synthesize(text, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+        wavBlob = result.wavBlob;
+      } else {
+        const result = await CloudSpeechSynthesizer.synthesize(text, synthesizeOptions);
+        wavBlob = result.wavBlob;
+      }
 
       if (!wavBlob) throw new Error('Audio generation failed.');
 
@@ -213,11 +223,20 @@ export default function App() {
     setActiveChunkIndex(index);
     // NOTE: We do NOT set isGenerating here — chunk preview is non-blocking
     try {
-      let { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
+      const synthesizeOptions = {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate
-      });
+      };
+
+      let wavBlob;
+      if (selectedProfile?.engine === 'edge-tts') {
+        const result = await EdgeTTSSynthesizer.synthesize(chunkText, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+        wavBlob = result.wavBlob;
+      } else {
+        const result = await CloudSpeechSynthesizer.synthesize(chunkText, synthesizeOptions);
+        wavBlob = result.wavBlob;
+      }
       if (wavBlob) {
         if (selectedBgm !== 'none') {
           wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
@@ -241,13 +260,22 @@ export default function App() {
     try {
       const rawLang = profile.lang || 'hi';
       const cleanLang = rawLang.split('-')[0];
-      const { wavBlob } = await CloudSpeechSynthesizer.synthesize(sample, { 
+      const synthesizeOptions = { 
         lang: cleanLang,
         pitch: profile.defaultPitch || 1.0,
         rate: profile.defaultRate || 1.0,
         engine: profile.engine,
         voiceProfile: profile
-      });
+      };
+
+      let wavBlob;
+      if (profile.engine === 'edge-tts') {
+        const result = await EdgeTTSSynthesizer.synthesize(sample, { ...synthesizeOptions, voice: profile.edgeVoice, lang: profile.lang });
+        wavBlob = result.wavBlob;
+      } else {
+        const result = await CloudSpeechSynthesizer.synthesize(sample, synthesizeOptions);
+        wavBlob = result.wavBlob;
+      }
       if (wavBlob) {
         await playBlob(wavBlob, () => setIsPlayingSample(false));
       } else {
@@ -265,11 +293,20 @@ export default function App() {
     setIsGenerating(true);
     setDownloadError('');
     try {
-      let { wavBlob } = await CloudSpeechSynthesizer.synthesize(chunkText, {
+      const synthesizeOptions = {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate,
-      });
+      };
+
+      let wavBlob;
+      if (selectedProfile?.engine === 'edge-tts') {
+        const result = await EdgeTTSSynthesizer.synthesize(chunkText, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+        wavBlob = result.wavBlob;
+      } else {
+        const result = await CloudSpeechSynthesizer.synthesize(chunkText, synthesizeOptions);
+        wavBlob = result.wavBlob;
+      }
       if (wavBlob) {
         if (selectedBgm !== 'none') {
           wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
@@ -354,7 +391,7 @@ export default function App() {
         ? Math.max(1, totalSelected - remainingPartsRef.current.length)
         : partNum;
 
-      let { wavBlob, endIndex, isComplete } = await CloudSpeechSynthesizer.synthesize(text, {
+      const synthesizeOptions = {
         lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
         pitch: pitch,
         rate: rate,
@@ -370,7 +407,20 @@ export default function App() {
               : progress.statusText
           });
         }
-      });
+      };
+
+      let wavBlob, endIndex, isComplete;
+      if (selectedProfile?.engine === 'edge-tts') {
+        const result = await EdgeTTSSynthesizer.synthesize(text, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+        wavBlob = result.wavBlob;
+        endIndex = result.endIndex;
+        isComplete = result.isComplete;
+      } else {
+        const result = await CloudSpeechSynthesizer.synthesize(text, synthesizeOptions);
+        wavBlob = result.wavBlob;
+        endIndex = result.endIndex;
+        isComplete = result.isComplete;
+      }
 
       if (!wavBlob || wavBlob.size < 100) {
         throw new Error('Audio generation failed. Block might be empty.');

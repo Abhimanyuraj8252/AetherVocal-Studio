@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, Volume2, Sparkles, Filter, Sliders, CheckCircle2, Play, Cpu, ShieldCheck, Zap, RotateCcw } from 'lucide-react';
+import { Mic, Volume2, Sparkles, Filter, Sliders, CheckCircle2, Play, Cpu, ShieldCheck, Zap, RotateCcw, Globe } from 'lucide-react';
 import { PREMIUM_VOICE_PROFILES } from '../utils/voiceProfiles';
 
 export function VoiceSelector({
@@ -18,12 +18,16 @@ export function VoiceSelector({
   isPlayingSample,
   onStopSample
 }) {
-  const [selectedEngine, setSelectedEngine] = useState('sherpa-onnx');
+  const [selectedEngine, setSelectedEngine] = useState('edge-tts');
 
   // Filter voice profiles dynamically by Engine, Language, and Gender
   const engineProfiles = PREMIUM_VOICE_PROFILES.filter(profile => {
     return selectedEngine === 'all' || profile.engine === selectedEngine || profile.engine === 'all';
   });
+
+  // Extract unique languages for the current engine
+  const uniqueLangs = [...new Set(engineProfiles.map(p => p.lang.split('-')[0].toLowerCase()))].sort();
+
 
   const filteredProfiles = engineProfiles.filter(profile => {
     const matchesLang = targetLang === 'all' || profile.lang.toLowerCase().includes(targetLang);
@@ -131,6 +135,22 @@ export function VoiceSelector({
             </div>
             <span className="engine-badge-tag" style={{ color: '#4285F4', background: 'rgba(66, 133, 244, 0.15)' }}>Cloud API</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedEngine('edge-tts')}
+            className={`neural-engine-btn ${selectedEngine === 'edge-tts' ? 'engine-active' : ''}`}
+            style={{ 
+              gridColumn: '1 / -1',
+              ...(selectedEngine === 'edge-tts' ? { borderColor: '#0078D7', background: 'rgba(0, 120, 215, 0.1)' } : {})
+            }}
+          >
+            <div className="engine-btn-left">
+              <Globe className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+              <span className="engine-btn-title">Microsoft Edge TTS (40+ Voices)</span>
+            </div>
+            <span className="engine-badge-tag" style={{ color: '#0078D7', background: 'rgba(0, 120, 215, 0.15)' }}>Web API</span>
+          </button>
         </div>
       </div>
 
@@ -139,7 +159,7 @@ export function VoiceSelector({
         {/* Language Segment */}
         <div className="filter-section">
           <span className="filter-label">Language / भाषा</span>
-          <div className="segmented-control">
+          <div className="segmented-control" style={{ display: 'flex', gap: '4px' }}>
             <button
               type="button"
               className={`segmented-btn ${targetLang === 'all' ? 'active' : ''}`}
@@ -161,6 +181,23 @@ export function VoiceSelector({
             >
               English
             </button>
+            {uniqueLangs.length > 2 && (
+              <select
+                className="segmented-btn"
+                style={{ appearance: 'none', backgroundColor: 'transparent', outline: 'none', border: 'none', color: 'inherit', cursor: 'pointer', paddingLeft: '8px', paddingRight: '8px' }}
+                value={['all', 'hi', 'en'].includes(targetLang) ? '' : targetLang}
+                onChange={(e) => {
+                  if (e.target.value) setTargetLang(e.target.value);
+                }}
+              >
+                <option value="" disabled style={{ color: '#000' }}>More...</option>
+                {uniqueLangs.filter(l => l !== 'hi' && l !== 'en').map(lang => (
+                  <option key={lang} value={lang} style={{ color: '#000' }}>
+                    {lang.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
