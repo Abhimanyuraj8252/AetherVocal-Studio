@@ -207,13 +207,105 @@ export class CloudSpeechSynthesizer {
   }
 
   /**
-   * Combines multiple saved WAV blobs into a single continuous WAV blob
+   * Combines multiple saved WAV blobs into a single continuous WAV blob.
+   * High-performance stream merging that prevents WebAudio API buffer memory limits on 50+ part batches.
+   * 
    * @param {Blob[]} blobs - Array of WAV blobs from IndexedDB
    * @param {Function} [onProgress] - Optional progress callback
+   * @returns {Promise<Blob>} Merged WAV audio blob
    */
   static async combineSavedBlobs(blobs, onProgress) {
     if (!blobs || blobs.length === 0) throw new Error("No blobs to combine");
+    if (blobs.length === 1) return blobs[0];
 
+    try {
+      return await this.combineWavBlobsBinary(blobs, onProgress);
+    } catch (err) {
+      console.warn("Direct binary WAV combine failed, attempting AudioContext fallback:", err);
+      return await this.combineWavBlobsAudioContext(blobs, onProgress);
+    }
+  }
+
+  /**
+   * High-Performance Direct Binary WAV Merger
+   * Merges PCM data chunks directly without allocating massive WebAudio AudioBuffers.
+   */
+  static async combineWavBlobsBinary(blobs, onProgress) {
+    const audioPcmChunks = [];
+    let totalPcmBytes = 0;
+    let headerArrayBuffer = null;
+
+    for (let i = 0; i < blobs.length; i++) {
+      if (onProgress) {
+        onProgress({ statusText: `Merging audio part ${i + 1} of ${blobs.length}...` });
+      }
+
+      const arrayBuffer = await blobs[i].arrayBuffer();
+      const view = new DataView(arrayBuffer);
+
+      if (view.byteLength < 44) {
+        throw new Error(`Part ${i + 1} is invalid WAV (too small)`);
+      }
+
+      // Check RIFF & WAVE header
+      const isRiff = view.getUint8(0) === 0x52 && view.getUint8(1) === 0x49 && view.getUint8(2) === 0x46 && view.getUint8(3) === 0x46;
+      const isWave = view.getUint8(8) === 0x57 && view.getUint8(9) === 0x41 && view.getUint8(10) === 0x56 && view.getUint8(11) === 0x45;
+
+      if (!isRiff || !isWave) {
+        throw new Error(`Part ${i + 1} is missing standard RIFF/WAVE header`);
+      }
+
+      // Find 'data' chunk
+      let dataOffset = 12;
+      let pcmSize = 0;
+      while (dataOffset <= view.byteLength - 8) {
+        const c1 = view.getUint8(dataOffset);
+        const c2 = view.getUint8(dataOffset + 1);
+        const c3 = view.getUint8(dataOffset + 2);
+        const c4 = view.getUint8(dataOffset + 3);
+        const chunkSize = view.getUint32(dataOffset + 4, true);
+
+        if (c1 === 0x64 && c2 === 0x61 && c3 === 0x74 && c4 === 0x61) { // 'data'
+          pcmSize = chunkSize;
+          dataOffset += 8;
+          break;
+        }
+        dataOffset += 8 + chunkSize;
+      }
+
+      if (pcmSize === 0 || dataOffset > view.byteLength) {
+        dataOffset = 44;
+        pcmSize = view.byteLength - 44;
+      }
+
+      if (!headerArrayBuffer) {
+        headerArrayBuffer = arrayBuffer.slice(0, dataOffset);
+      }
+
+      const pcmBytes = new Uint8Array(arrayBuffer, dataOffset, Math.min(pcmSize, view.byteLength - dataOffset));
+      audioPcmChunks.push(pcmBytes);
+      totalPcmBytes += pcmBytes.byteLength;
+    }
+
+    if (!headerArrayBuffer || audioPcmChunks.length === 0) {
+      throw new Error("Could not extract audio data from parts");
+    }
+
+    // Clone header and update RIFF total size and data chunk size
+    const newHeaderBuffer = headerArrayBuffer.slice(0);
+    const headerView = new DataView(newHeaderBuffer);
+
+    const riffTotalSize = newHeaderBuffer.byteLength - 8 + totalPcmBytes;
+    headerView.setUint32(4, Math.min(riffTotalSize, 0xFFFFFFFF), true);
+    headerView.setUint32(newHeaderBuffer.byteLength - 4, Math.min(totalPcmBytes, 0xFFFFFFFF), true);
+
+    return new Blob([newHeaderBuffer, ...audioPcmChunks], { type: 'audio/wav' });
+  }
+
+  /**
+   * Fallback Web Audio API stitcher
+   */
+  static async combineWavBlobsAudioContext(blobs, onProgress) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContextClass();
     const audioBuffers = [];
@@ -228,15 +320,10 @@ export class CloudSpeechSynthesizer {
     }
 
     if (onProgress) {
-      onProgress({ statusText: "Stitching blocks gaplessly..." });
+      onProgress({ statusText: "Stitching blocks..." });
     }
     
     const combinedBuffer = this.stitchAudioBuffers(audioBuffers, audioCtx);
-    
-    if (onProgress) {
-      onProgress({ statusText: "Exporting final combined WAV file..." });
-    }
-    
     const wavBlob = this.audioBufferToWavBlob(combinedBuffer);
 
     try {

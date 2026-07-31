@@ -46,6 +46,7 @@ export default function App() {
   const [downloadError, setDownloadError] = useState('');
   const [lastGeneratedChunkIndex, setLastGeneratedChunkIndex] = useState(0);
   const [compressionReport, setCompressionReport] = useState(null);
+  const [enableCompression, setEnableCompression] = useState(true);
 
   // Auto-Queue Batch Generation State
   const [autoGenerateAll, setAutoGenerateAll] = useState(false);
@@ -255,14 +256,13 @@ export default function App() {
         }
 
         const rawSize = wavBlob.size;
-        // Smart compression based on selected format with status progress
-        setGenerationProgress({ current: index + 1, total: chunks.length, percent: 85, statusText: '⚡ Compressing chunk audio...' });
         let downloadBlob = wavBlob;
         let ext = 'wav';
         if (selectedFormat === 'webm') {
           downloadBlob = await AudioCompressor.encodeToCompressedFormat(wavBlob);
           ext = 'mp3';
-        } else {
+        } else if (enableCompression) {
+          setGenerationProgress({ current: index + 1, total: chunks.length, percent: 85, statusText: '⚡ Compressing chunk audio...' });
           downloadBlob = await AudioCompressor.compressWavBlob(wavBlob, { targetSampleRate: 22050, mono: true });
         }
 
@@ -270,14 +270,16 @@ export default function App() {
         MobileSafeAudioExporter.resumeAudioContext();
         MobileSafeAudioExporter.download(downloadBlob, filename);
 
-        const stats = AudioCompressor.getCompressionStats(rawSize, downloadBlob.size);
-        setCompressionReport({
-          filename,
-          originalFormatted: stats.originalFormatted,
-          compressedFormatted: stats.compressedFormatted,
-          reductionPercent: stats.reductionPercent,
-          format: ext.toUpperCase()
-        });
+        if (enableCompression || selectedFormat === 'webm') {
+          const stats = AudioCompressor.getCompressionStats(rawSize, downloadBlob.size);
+          setCompressionReport({
+            filename,
+            originalFormatted: stats.originalFormatted,
+            compressedFormatted: stats.compressedFormatted,
+            reductionPercent: stats.reductionPercent,
+            format: ext.toUpperCase()
+          });
+        }
       }
     } catch (err) {
       console.warn('Chunk download error:', err);
@@ -285,7 +287,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [targetLang, pitch, rate, isGenerating, selectedBgm, bgmVolume, selectedFormat, chunks.length]);
+  }, [targetLang, pitch, rate, isGenerating, selectedBgm, bgmVolume, selectedFormat, chunks.length, enableCompression]);
 
   // ─── DOWNLOAD: BLOCK GENERATION (WITH AUTO-QUEUE & COMPRESSION) ───
   const handleGenerateBlock = useCallback(async () => {
@@ -327,9 +329,11 @@ export default function App() {
         wavBlob = await mixAudioBlobWithBGM(wavBlob, selectedBgm, bgmVolume);
       }
 
-      // Smart compression before saving — reduces IndexedDB storage
-      setGenerationProgress(prev => ({ ...prev, percent: 98, statusText: `⚡ Compressing Part ${partNum} Audio...` }));
-      wavBlob = await AudioCompressor.compressWavBlob(wavBlob, { targetSampleRate: 22050, mono: true });
+      // Smart compression before saving — reduces IndexedDB storage (if enabled)
+      if (enableCompression) {
+        setGenerationProgress(prev => ({ ...prev, percent: 98, statusText: `⚡ Compressing Part ${partNum} Audio...` }));
+        wavBlob = await AudioCompressor.compressWavBlob(wavBlob, { targetSampleRate: 22050, mono: true });
+      }
 
       // Save to IndexedDB
       const dbId = `audio_blob_${Date.now()}`;
@@ -346,7 +350,7 @@ export default function App() {
         isPart: true
       };
 
-      const updatedHistory = [historyItem, ...audioHistory].slice(0, 50); // Keep 50 blocks
+      const updatedHistory = [historyItem, ...audioHistory]; // Keep all generated parts (no 50-limit cap!)
       setAudioHistory(updatedHistory);
       localStorage.setItem('aethervocal_audio_history', JSON.stringify(updatedHistory));
 
@@ -373,7 +377,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume, chunks.length]);
+  }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume, chunks.length, enableCompression]);
 
   // Sync generateBlockRef so setTimeout always uses the latest closure
   useEffect(() => {
@@ -430,14 +434,14 @@ export default function App() {
       });
 
       const rawSize = combinedBlob.size;
-      // Smart compression on combined download with live feedback
-      setGenerationProgress({ current: 0, total: 100, percent: 85, statusText: '⚡ Compressing combined audio...' });
-      let downloadBlob;
-      let ext;
+      let downloadBlob = combinedBlob;
+      let ext = 'wav';
       if (selectedFormat === 'webm') {
+        setGenerationProgress({ current: 0, total: 100, percent: 85, statusText: '⚡ Encoding MP3 audio...' });
         downloadBlob = await AudioCompressor.encodeToCompressedFormat(combinedBlob);
         ext = 'mp3';
-      } else {
+      } else if (enableCompression) {
+        setGenerationProgress({ current: 0, total: 100, percent: 85, statusText: '⚡ Compressing combined audio...' });
         downloadBlob = await AudioCompressor.compressWavBlob(combinedBlob, { targetSampleRate: 22050, mono: true });
         ext = 'wav';
       }
@@ -448,14 +452,16 @@ export default function App() {
       MobileSafeAudioExporter.resumeAudioContext();
       MobileSafeAudioExporter.download(downloadBlob, filename);
 
-      const stats = AudioCompressor.getCompressionStats(rawSize, downloadBlob.size);
-      setCompressionReport({
-        filename,
-        originalFormatted: stats.originalFormatted,
-        compressedFormatted: stats.compressedFormatted,
-        reductionPercent: stats.reductionPercent,
-        format: ext.toUpperCase()
-      });
+      if (enableCompression || selectedFormat === 'webm') {
+        const stats = AudioCompressor.getCompressionStats(rawSize, downloadBlob.size);
+        setCompressionReport({
+          filename,
+          originalFormatted: stats.originalFormatted,
+          compressedFormatted: stats.compressedFormatted,
+          reductionPercent: stats.reductionPercent,
+          format: ext.toUpperCase()
+        });
+      }
 
     } catch (err) {
       setDownloadError("Combine failed: " + err.message);
@@ -463,7 +469,7 @@ export default function App() {
       setIsGenerating(false);
       setGenerationProgress({ current: 0, total: 0, percent: 0, statusText: '' });
     }
-  }, [audioHistory, selectedFormat, text]);
+  }, [audioHistory, selectedFormat, text, enableCompression]);
 
   const handleDismissError = useCallback(() => setDownloadError(''), []);
   const handleDismissCompressionReport = useCallback(() => setCompressionReport(null), []);
@@ -585,6 +591,8 @@ export default function App() {
         onDismissError={handleDismissError}
         selectedFormat={selectedFormat}
         setSelectedFormat={setSelectedFormat}
+        enableCompression={enableCompression}
+        setEnableCompression={setEnableCompression}
         stats={{ charCount, wordCount, formattedDuration }}
         isComplete={lastGeneratedChunkIndex >= chunks.length && chunks.length > 0}
         nextChunkIndex={lastGeneratedChunkIndex}

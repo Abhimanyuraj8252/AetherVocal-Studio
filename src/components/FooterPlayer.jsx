@@ -14,6 +14,8 @@ export function FooterPlayer({
   onDismissError,
   selectedFormat,
   setSelectedFormat,
+  enableCompression = true,
+  setEnableCompression,
   stats,
   isComplete,
   nextChunkIndex,
@@ -96,6 +98,29 @@ export function FooterPlayer({
               onClick={() => setSelectedFormat('webm')}
             >
               MP3
+            </button>
+          </div>
+        </div>
+
+        {/* Compression Selector */}
+        <div className="player-format-picker">
+          <span className="format-label">Compress:</span>
+          <div className="segmented-control flex-1">
+            <button
+              type="button"
+              className={`segmented-btn ${enableCompression ? 'active' : ''}`}
+              onClick={() => setEnableCompression && setEnableCompression(true)}
+              title="Compress audio to reduce file size"
+            >
+              ON
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${!enableCompression ? 'active' : ''}`}
+              onClick={() => setEnableCompression && setEnableCompression(false)}
+              title="Disable compression for original high quality"
+            >
+              OFF
             </button>
           </div>
         </div>

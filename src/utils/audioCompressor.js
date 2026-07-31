@@ -13,33 +13,46 @@ export class AudioCompressor {
    */
   static async compressWavBlob(wavBlob, options = {}) {
     const { targetSampleRate = 22050, mono = true } = options;
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!wavBlob) return wavBlob;
+    
+    // Safety guard: if blob is larger than 150MB, skip OfflineAudioContext to prevent browser memory crash
+    if (wavBlob.size > 150 * 1024 * 1024) {
+      console.warn("WAV blob size > 150MB, returning directly to avoid browser AudioContext memory limit.");
+      return wavBlob;
+    }
+
     try {
-      const arrayBuffer = await wavBlob.arrayBuffer();
-      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      try {
+        const arrayBuffer = await wavBlob.arrayBuffer();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-      // If already at target quality, return as-is
-      if (audioBuffer.sampleRate <= targetSampleRate && (audioBuffer.numberOfChannels === 1 || !mono)) {
-        return wavBlob;
+        // If already at target quality, return as-is
+        if (audioBuffer.sampleRate <= targetSampleRate && (audioBuffer.numberOfChannels === 1 || !mono)) {
+          return wavBlob;
+        }
+
+        const numChannels = mono ? 1 : audioBuffer.numberOfChannels;
+        const duration = audioBuffer.duration;
+        const offlineCtx = new OfflineAudioContext(
+          numChannels,
+          Math.ceil(duration * targetSampleRate),
+          targetSampleRate
+        );
+
+        const source = offlineCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(offlineCtx.destination);
+        source.start(0);
+
+        const renderedBuffer = await offlineCtx.startRendering();
+        return AudioCompressor.audioBufferToWavBlob(renderedBuffer);
+      } finally {
+        await audioCtx.close();
       }
-
-      const numChannels = mono ? 1 : audioBuffer.numberOfChannels;
-      const duration = audioBuffer.duration;
-      const offlineCtx = new OfflineAudioContext(
-        numChannels,
-        Math.ceil(duration * targetSampleRate),
-        targetSampleRate
-      );
-
-      const source = offlineCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(offlineCtx.destination);
-      source.start(0);
-
-      const renderedBuffer = await offlineCtx.startRendering();
-      return AudioCompressor.audioBufferToWavBlob(renderedBuffer);
-    } finally {
-      await audioCtx.close();
+    } catch (e) {
+      console.warn("compressWavBlob failed, returning original blob:", e);
+      return wavBlob;
     }
   }
 
