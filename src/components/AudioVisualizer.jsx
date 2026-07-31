@@ -176,39 +176,33 @@ export function AudioVisualizer({ isSpeaking, isRecording, isPlaying, isGenerati
         </div>
 
         {/* Mode Selector Buttons */}
-        <div className="flex items-center gap-1 bg-slate-900/90 p-1 border border-slate-800 rounded-lg">
+        <div className="viz-mode-dock">
           <button
             type="button"
-            className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-              vizMode === 'bars' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'
-            }`}
+            className={`viz-mode-btn ${vizMode === 'bars' ? 'active-bars' : ''}`}
             onClick={() => setVizMode('bars')}
             title="Quantum Bars Visualizer"
           >
             <Activity className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Bars</span>
+            <span>Bars</span>
           </button>
           <button
             type="button"
-            className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-              vizMode === 'spectrum' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'
-            }`}
+            className={`viz-mode-btn ${vizMode === 'spectrum' ? 'active-wave' : ''}`}
             onClick={() => setVizMode('spectrum')}
             title="Neon Spectrum Wave"
           >
             <Radio className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Wave</span>
+            <span>Wave</span>
           </button>
           <button
             type="button"
-            className={`px-2 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-              vizMode === 'ring' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'
-            }`}
+            className={`viz-mode-btn ${vizMode === 'ring' ? 'active-ring' : ''}`}
             onClick={() => setVizMode('ring')}
             title="Holographic Ring"
           >
             <Disc className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Ring</span>
+            <span>Ring</span>
           </button>
         </div>
       </div>
