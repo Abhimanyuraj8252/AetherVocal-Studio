@@ -48,24 +48,26 @@ export function SpeechPartQueue({
   return (
     <div className="card speech-part-queue-card">
       <div className="part-queue-header">
-        <div className="part-queue-title-group">
-          <div className="queue-title-icon-wrapper">
+        <div className="part-queue-title-group min-w-0 flex-1">
+          <div className="queue-title-icon-wrapper flex-shrink-0">
             <Layers className="card-icon" style={{ color: 'var(--cyan-accent)', width: 16, height: 16 }} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="card-title text-gradient-cyan" style={{ fontSize: '0.9rem' }}>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="card-title text-gradient-cyan" style={{ fontSize: '0.9rem', lineHeight: '1.2' }}>
                 Speech Generation Queue ({totalParts} {totalParts === 1 ? 'Part' : 'Parts'})
               </h3>
               <span className="selected-count-badge">
                 Selected: {selectedCount}/{totalParts}
               </span>
             </div>
-            <p className="card-description" style={{ fontSize: '0.7rem' }}>Select parts to generate (Total {totalChunks} chunks)</p>
+            <p className="card-description" style={{ fontSize: '0.7rem', marginTop: '2px' }}>
+              Select parts to generate (Total {totalChunks} chunks)
+            </p>
           </div>
         </div>
         
-        <div className="part-queue-header-actions">
+        <div className="part-queue-header-actions flex-shrink-0">
           <button 
             type="button" 
             onClick={handleSelectAll} 

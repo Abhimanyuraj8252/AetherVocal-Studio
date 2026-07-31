@@ -171,24 +171,28 @@ export function FileUploader({ onTextLoaded, onGenerateAudio, currentTextLength 
           </div>
         ) : (
           <div className="file-active-container">
-            <div className="file-info-header">
-              <div className="flex items-center gap-3">
-                <div className="file-icon-badge">
+            <div className="file-info-header flex items-center justify-between gap-2 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
+                <div className="file-icon-badge flex-shrink-0">
                   {uploadedFileInfo.isSubtitle ? (
                     <FileCode className="w-5 h-5 text-amber-400" />
                   ) : (
                     <FileType className="w-5 h-5 text-cyan-400" />
                   )}
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-100 text-sm truncate max-w-[200px] sm:max-w-[300px]">{uploadedFileInfo.name}</span>
-                    <span className="file-type-chip">{uploadedFileInfo.type}</span>
-                    {uploadedFileInfo.isSubtitle && (
-                      <span className="file-tag-sub">Subtitles Cleaned</span>
-                    )}
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap min-w-0">
+                    <span className="font-semibold text-slate-100 text-sm truncate block max-w-full" title={uploadedFileInfo.name}>
+                      {uploadedFileInfo.name}
+                    </span>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className="file-type-chip">{uploadedFileInfo.type}</span>
+                      {uploadedFileInfo.isSubtitle && (
+                        <span className="file-tag-sub">Subtitles Cleaned</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-400 flex items-center gap-3 mt-0.5">
+                  <div className="text-xs text-slate-400 flex items-center gap-3 mt-0.5 flex-wrap">
                     <span>Size: <strong className="text-slate-200">{uploadedFileInfo.size}</strong></span>
                     <span>Chars: <strong className="text-cyan-400">{uploadedFileInfo.charCount}</strong></span>
                     <span>Lines: <strong className="text-pink-400">{uploadedFileInfo.lineCount}</strong></span>
@@ -196,7 +200,7 @@ export function FileUploader({ onTextLoaded, onGenerateAudio, currentTextLength 
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
                 <button
                   type="button"
                   onClick={(e) => {

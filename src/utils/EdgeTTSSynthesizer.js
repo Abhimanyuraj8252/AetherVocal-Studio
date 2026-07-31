@@ -111,12 +111,34 @@ export default class EdgeTTSSynthesizer {
    * Internal method to attempt synthesizing a chunk once.
    */
   static async _synthesizeChunkAttempt(text, voice, lang, rate, pitch) {
+    // 1. Try Vercel Serverless Function API endpoint first (/api/edge-tts)
+    try {
+      const response = await fetch('/api/edge-tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice, lang, rate, pitch }),
+      });
+
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        if (arrayBuffer && arrayBuffer.byteLength > 0) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          const audioContext = new AudioContextClass();
+          const decoded = await audioContext.decodeAudioData(arrayBuffer);
+          try { if (audioContext.state !== 'closed') audioContext.close(); } catch(e) {}
+          return decoded;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Serverless API /api/edge-tts unavailable, falling back to local WebSocket proxy:', apiErr.message);
+    }
+
+    // 2. Fallback to local Vite WebSocket proxy for dev environment
     const secGec = await this.generateSecMsGec();
     const secGecVer = '1-143.0.3644.0';
 
     return new Promise((resolve, reject) => {
       const connectionId = this.generateUUID();
-      // Use local proxy to bypass Origin & Header restrictions enforced by Microsoft Edge TTS endpoint
       const isSecure = window.location.protocol === 'https:';
       const wsProtocol = isSecure ? 'wss:' : 'ws:';
       const wsUrl = `${wsProtocol}//${window.location.host}/edge-tts/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=${connectionId}&Sec-MS-GEC=${secGec}&Sec-MS-GEC-Version=${secGecVer}`;
@@ -124,7 +146,6 @@ export default class EdgeTTSSynthesizer {
       const ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
 
-      // Timeout after 30 seconds
       const timeoutId = setTimeout(() => {
         ws.close();
         reject(new Error('WebSocket connection timed out after 30 seconds.'));
@@ -133,14 +154,12 @@ export default class EdgeTTSSynthesizer {
       const audioDataChunks = [];
 
       ws.onopen = () => {
-        // 1. Send configuration message
         const configMessage = 
           "Content-Type:application/json; charset=utf-8\r\n" +
           "Path:speech.config\r\n\r\n" +
           '{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}';
         ws.send(configMessage);
 
-        // 2. Escape XML entities in text for SSML
         const escapedText = text
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -151,7 +170,6 @@ export default class EdgeTTSSynthesizer {
         const requestId = this.generateUUID();
         const timestamp = this.getTimestamp();
 
-        // 3. Send SSML synthesis request with strictly original prosody (+0Hz, +0%)
         const ssmlMessage = 
           `X-RequestId:${requestId}\r\n` +
           `Content-Type:application/ssml+xml\r\n` +
@@ -167,11 +185,8 @@ export default class EdgeTTSSynthesizer {
 
       ws.onmessage = async (event) => {
         if (event.data instanceof ArrayBuffer) {
-          // Binary message containing audio data
           const buffer = new Uint8Array(event.data);
-          
           if (buffer.length >= 2) {
-            // First 2 bytes represent headerLength (big-endian 16-bit integer)
             const headerLength = (buffer[0] << 8) | buffer[1];
             if (buffer.length >= 2 + headerLength) {
               const audioData = buffer.slice(2 + headerLength);
@@ -181,13 +196,11 @@ export default class EdgeTTSSynthesizer {
             }
           }
         } else if (typeof event.data === 'string') {
-          // Text message
           if (event.data.includes('Path:turn.end')) {
             clearTimeout(timeoutId);
             ws.close();
 
             try {
-              // Combine all audio chunks
               const totalLength = audioDataChunks.reduce((acc, val) => acc + val.length, 0);
               const combinedArray = new Uint8Array(totalLength);
               let offset = 0;
@@ -196,10 +209,9 @@ export default class EdgeTTSSynthesizer {
                 offset += chunk.length;
               }
 
-              // Decode MP3 audio data into AudioBuffer
               const audioContext = new (window.AudioContext || window.webkitAudioContext)();
               const audioBuffer = await audioContext.decodeAudioData(combinedArray.buffer);
-              
+              try { if (audioContext.state !== 'closed') audioContext.close(); } catch(e) {}
               resolve(audioBuffer);
             } catch (err) {
               reject(new Error('Failed to decode audio data: ' + err.message));
@@ -215,7 +227,6 @@ export default class EdgeTTSSynthesizer {
       
       ws.onclose = (event) => {
         clearTimeout(timeoutId);
-        // If the socket closed without turn.end, reject
         if (audioDataChunks.length === 0 && event.code !== 1000) {
           reject(new Error(`WebSocket closed prematurely (code: ${event.code})`));
         }
