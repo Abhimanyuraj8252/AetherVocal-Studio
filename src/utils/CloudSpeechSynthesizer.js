@@ -86,7 +86,10 @@ export class CloudSpeechSynthesizer {
   static async synthesize(text, options = {}) {
     const { onProgress, startIndex = 0, maxChunks = 20, pitch = 1.0, rate = 1.0 } = options;
     const isHindi = /[\u0900-\u097F]/.test(text);
-    const lang = options.lang || (isHindi ? 'hi' : 'en');
+    let lang = options.lang || (isHindi ? 'hi' : 'en');
+    if (lang.includes('-')) {
+      lang = lang.split('-')[0];
+    }
 
     // 1. SMART TEXT CHUNKER
     const allChunks = this.smartChunkText(text, 180);
@@ -356,7 +359,8 @@ export class CloudSpeechSynthesizer {
           return silentBuffer;
         }
 
-        const primaryUrl = `https://lingva.ml/api/v1/audio/${lang}/${encodeURIComponent(cleanChunk)}`;
+        const cleanLang = (lang || 'hi').split('-')[0];
+        const primaryUrl = `https://lingva.ml/api/v1/audio/${cleanLang}/${encodeURIComponent(cleanChunk)}`;
         const response = await fetch(primaryUrl);
         
         if (response.ok) {
@@ -369,7 +373,7 @@ export class CloudSpeechSynthesizer {
         }
 
         // Fallback: direct Google Translate TTS endpoint
-        const fallbackUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&q=${encodeURIComponent(cleanChunk)}&tl=${lang}`;
+        const fallbackUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&q=${encodeURIComponent(cleanChunk)}&tl=${cleanLang}`;
         const res = await fetch(fallbackUrl);
         if (res.ok) {
           const arrayBuffer = await res.arrayBuffer();

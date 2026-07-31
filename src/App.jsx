@@ -237,18 +237,25 @@ export default function App() {
     // NOTE: We do NOT set isGenerating here — sample playback is non-blocking
     const sample = profile.sampleText || 'AetherVocal Studio Speech Synthesis';
     try {
+      const rawLang = profile.lang || 'hi';
+      const cleanLang = rawLang.split('-')[0];
       const { wavBlob } = await CloudSpeechSynthesizer.synthesize(sample, { 
-        lang: profile.lang || 'hi',
+        lang: cleanLang,
         pitch: profile.defaultPitch || 1.0,
-        rate: profile.defaultRate || 1.0 
+        rate: profile.defaultRate || 1.0,
+        engine: profile.engine,
+        voiceProfile: profile
       });
       if (wavBlob) {
-        await playBlob(wavBlob);
+        await playBlob(wavBlob, () => setIsPlayingSample(false));
+      } else {
+        setIsPlayingSample(false);
       }
     } catch (e) {
+      console.warn("Play sample error:", e);
       setIsPlayingSample(false);
     }
-  }, []);
+  }, [stopAudio, playBlob]);
 
   // ─── DOWNLOAD SINGLE CHUNK (WITH COMPRESSION & SCRIPT FILENAME) ───
   const handleDownloadSingleChunk = useCallback(async (chunkText, index) => {
