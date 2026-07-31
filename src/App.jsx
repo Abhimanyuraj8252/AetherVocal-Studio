@@ -64,6 +64,7 @@ export default function App() {
 
   const audioRef = useRef(new Audio());
   const currentObjectUrlRef = useRef(null);
+  const generateBlockRef = useRef(null);
 
   // Sync theme attribute to document root
   useEffect(() => {
@@ -358,7 +359,9 @@ export default function App() {
       } else if (autoGenerateRef.current) {
         // Auto-queue: schedule next part after a brief UI update delay
         setIsGenerating(false);
-        setTimeout(() => handleGenerateBlock(), 800);
+        setTimeout(() => {
+          if (generateBlockRef.current) generateBlockRef.current();
+        }, 800);
         return; // Don't hit the finally block's setIsGenerating(false) yet
       }
 
@@ -371,6 +374,11 @@ export default function App() {
       setIsGenerating(false);
     }
   }, [text, isGenerating, selectedProfile, targetLang, audioHistory, lastGeneratedChunkIndex, pitch, rate, selectedBgm, bgmVolume, chunks.length]);
+
+  // Sync generateBlockRef so setTimeout always uses the latest closure
+  useEffect(() => {
+    generateBlockRef.current = handleGenerateBlock;
+  }, [handleGenerateBlock]);
 
   // ─── HISTORY ACTIONS ───
   const handleClearHistory = useCallback(async () => {
@@ -467,8 +475,10 @@ export default function App() {
     setAutoQueueActive(true);
     autoGenerateRef.current = true;
     // Trigger the first block — the chain will continue via handleGenerateBlock
-    setTimeout(() => handleGenerateBlock(), 100);
-  }, [isGenerating, handleGenerateBlock]);
+    setTimeout(() => {
+      if (generateBlockRef.current) generateBlockRef.current();
+    }, 100);
+  }, [isGenerating]);
 
   const handleCancelAutoQueue = useCallback(() => {
     setAutoGenerateAll(false);
