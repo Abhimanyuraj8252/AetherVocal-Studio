@@ -29,6 +29,15 @@ export default class EdgeTTSSynthesizer {
       maxChunks = 20,
     } = options;
 
+    let normalizedLang = lang;
+    if (!normalizedLang || normalizedLang === 'multilingual') {
+      normalizedLang = /[\u0900-\u097F]/.test(text) ? 'hi-IN' : 'en-US';
+    } else if (normalizedLang === 'hi') {
+      normalizedLang = 'hi-IN';
+    } else if (normalizedLang === 'en') {
+      normalizedLang = 'en-US';
+    }
+
     // Split text into chunks using CloudSpeechSynthesizer's smart chunking
     const allChunks = CloudSpeechSynthesizer.smartChunkText(text, 180);
     const totalChunks = allChunks.length;
@@ -46,7 +55,7 @@ export default class EdgeTTSSynthesizer {
       
       try {
         // Synthesize the individual chunk
-        const buffer = await this.synthesizeChunk(chunk, voice, lang, rate, pitch);
+        const buffer = await this.synthesizeChunk(chunk, voice, normalizedLang, rate, pitch);
         if (buffer) {
           audioBuffers.push(buffer);
         }

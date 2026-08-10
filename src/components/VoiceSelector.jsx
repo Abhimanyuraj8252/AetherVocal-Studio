@@ -17,7 +17,9 @@ export function VoiceSelector({
   charCount,
   onPlaySample,
   isPlayingSample,
-  onStopSample
+  onStopSample,
+  manualLang = 'auto',
+  setManualLang
 }) {
   const [selectedEngine, setSelectedEngine] = useState('edge-tts');
 
@@ -27,15 +29,16 @@ export function VoiceSelector({
   });
 
   // Extract unique languages for the current engine
-  const uniqueLangs = [...new Set(engineProfiles.map(p => p.lang.split('-')[0].toLowerCase()))].sort();
-
+  const uniqueLangs = [...new Set(engineProfiles.map(p => p.lang.split('-')[0].toLowerCase()))].filter(l => l !== 'multilingual').sort();
 
   const filteredProfiles = engineProfiles.filter(profile => {
-    const matchesLang = targetLang === 'all' || profile.lang.toLowerCase().includes(targetLang);
+    const matchesLang = targetLang === 'all'
+      || (targetLang === 'multilingual' ? (profile.isMultilingual || profile.lang === 'multilingual') : false)
+      || profile.lang.toLowerCase().includes(targetLang)
+      || (profile.isMultilingual && (targetLang === 'hi' || targetLang === 'en'));
     const matchesGender = targetGender === 'all' || profile.gender.toLowerCase() === targetGender;
     return matchesLang && matchesGender;
   });
-
 
   // Auto-select first profile if current selection doesn't match
   useEffect(() => {
@@ -149,10 +152,43 @@ export function VoiceSelector({
           >
             <div className="engine-btn-left">
               <Globe className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-              <span className="engine-btn-title">Microsoft Edge TTS (40+ Voices)</span>
+              <span className="engine-btn-title">Microsoft Edge TTS (45+ Voices & Multilingual)</span>
             </div>
             <span className="engine-badge-tag" style={{ color: '#0078D7', background: 'rgba(0, 120, 215, 0.15)' }}>Web API</span>
           </button>
+        </div>
+      </div>
+
+      {/* MANUAL SYNTHESIS LANGUAGE SELECTOR */}
+      <div className="manual-lang-bar">
+        <div className="manual-lang-title">
+          <Globe className="w-3.5 h-3.5" />
+          <span>Manual TTS Language (मैनुअल भाषा):</span>
+        </div>
+        <div className="custom-select-wrapper">
+          <select
+            value={manualLang || 'auto'}
+            onChange={(e) => setManualLang && setManualLang(e.target.value)}
+            className="premium-select-input"
+          >
+            <option value="auto">✨ Auto Detect (स्मार्ट ऑटो)</option>
+            <option value="hi-IN">🇮🇳 Hindi (हिंदी - hi-IN)</option>
+            <option value="en-US">🇺🇸 English US (en-US)</option>
+            <option value="en-IN">🇮🇳 Indian English (en-IN)</option>
+            <option value="en-GB">🇬🇧 English UK (en-GB)</option>
+            <option value="bn-IN">🇮🇳 Bengali (বাংলা - bn-IN)</option>
+            <option value="ta-IN">🇮🇳 Tamil (தமிழ் - ta-IN)</option>
+            <option value="te-IN">🇮🇳 Telugu (తెలుగు - te-IN)</option>
+            <option value="mr-IN">🇮🇳 Marathi (मराठी - mr-IN)</option>
+            <option value="gu-IN">🇮🇳 Gujarati (ગુજરાતી - gu-IN)</option>
+            <option value="es-ES">🇪🇸 Spanish (Español - es-ES)</option>
+            <option value="fr-FR">🇫🇷 French (Français - fr-FR)</option>
+            <option value="de-DE">🇩🇪 German (Deutsch - de-DE)</option>
+            <option value="ja-JP">🇯🇵 Japanese (日本語 - ja-JP)</option>
+            <option value="zh-CN">🇨🇳 Chinese Mandarin (中文 - zh-CN)</option>
+            <option value="ar-SA">🇸🇦 Arabic (العربية - ar-SA)</option>
+            <option value="ur-PK">🇵🇰 Urdu (اردو - ur-PK)</option>
+          </select>
         </div>
       </div>
 
@@ -161,7 +197,7 @@ export function VoiceSelector({
         {/* Language Segment */}
         <div className="filter-section">
           <span className="filter-label">Language / भाषा</span>
-          <div className="segmented-control" style={{ display: 'flex', gap: '4px' }}>
+          <div className="segmented-control" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             <button
               type="button"
               className={`segmented-btn ${targetLang === 'all' ? 'active' : ''}`}
@@ -183,22 +219,30 @@ export function VoiceSelector({
             >
               English
             </button>
+            <button
+              type="button"
+              className={`segmented-btn ${targetLang === 'multilingual' ? 'active' : ''}`}
+              onClick={() => setTargetLang('multilingual')}
+            >
+              Multilingual ✨
+            </button>
             {uniqueLangs.length > 2 && (
-              <select
-                className="segmented-btn"
-                style={{ appearance: 'none', backgroundColor: 'transparent', outline: 'none', border: 'none', color: 'inherit', cursor: 'pointer', paddingLeft: '8px', paddingRight: '8px' }}
-                value={['all', 'hi', 'en'].includes(targetLang) ? '' : targetLang}
-                onChange={(e) => {
-                  if (e.target.value) setTargetLang(e.target.value);
-                }}
-              >
-                <option value="" disabled style={{ color: '#000' }}>More...</option>
-                {uniqueLangs.filter(l => l !== 'hi' && l !== 'en').map(lang => (
-                  <option key={lang} value={lang} style={{ color: '#000' }}>
-                    {lang.toUpperCase()}
-                  </option>
-                ))}
-              </select>
+              <div className="segmented-select-wrapper">
+                <select
+                  className={`segmented-select ${!['all', 'hi', 'en', 'multilingual'].includes(targetLang) ? 'active' : ''}`}
+                  value={['all', 'hi', 'en', 'multilingual'].includes(targetLang) ? '' : targetLang}
+                  onChange={(e) => {
+                    if (e.target.value) setTargetLang(e.target.value);
+                  }}
+                >
+                  <option value="" disabled>More...</option>
+                  {uniqueLangs.filter(l => l !== 'hi' && l !== 'en' && l !== 'multilingual').map(lang => (
+                    <option key={lang} value={lang}>
+                      {lang.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         </div>
@@ -264,6 +308,11 @@ export function VoiceSelector({
                     <span className="badge-pill badge-model">
                       {profile.modelTag}
                     </span>
+                    {profile.isMultilingual && (
+                      <span className="badge-pill" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#93c5fd', border: '1px solid rgba(59, 130, 246, 0.4)' }}>
+                        Multilingual ✨
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

@@ -25,6 +25,7 @@ export default function App() {
   const [autoSanitize, setAutoSanitize] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState(PREMIUM_VOICE_PROFILES[0]);
   const [targetLang, setTargetLang] = useState('all');
+  const [manualLang, setManualLang] = useState('auto');
   const [targetGender, setTargetGender] = useState('all');
   const [rate, setRate] = useState(1.0);
   const [pitch, setPitch] = useState(1.15);
@@ -58,6 +59,18 @@ export default function App() {
   const [generatingPartNum, setGeneratingPartNum] = useState(null);
   const remainingPartsRef = useRef([]);
   const totalSelectedPartsRef = useRef(0);
+
+  // Helper to determine effective language for TTS synthesis
+  const getEffectiveLang = useCallback((sampleOrChunkText, profile = selectedProfile) => {
+    if (manualLang && manualLang !== 'auto') return manualLang;
+    if (targetLang && targetLang !== 'all' && targetLang !== 'multilingual') {
+      return targetLang;
+    }
+    if (profile?.lang && profile.lang !== 'multilingual') {
+      return profile.lang;
+    }
+    return /[\u0900-\u097F]/.test(sampleOrChunkText || '') ? 'hi-IN' : 'en-US';
+  }, [manualLang, targetLang, selectedProfile]);
 
   // Audio History Log
   const [audioHistory, setAudioHistory] = useState(() => {
@@ -178,8 +191,9 @@ export default function App() {
     setIsPreviewLoading(true);
 
     try {
+      const effectiveLang = getEffectiveLang(text, selectedProfile);
       const synthesizeOptions = {
-        lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
+        lang: effectiveLang,
         pitch: pitch,
         rate: rate,
         startIndex: 0,
@@ -191,7 +205,7 @@ export default function App() {
       // 1. Try Primary Synthesizer Engine (Edge TTS or Cloud Synthesizer)
       try {
         if (selectedProfile?.engine === 'edge-tts') {
-          const result = await EdgeTTSSynthesizer.synthesize(text, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+          const result = await EdgeTTSSynthesizer.synthesize(text, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: effectiveLang });
           wavBlob = result?.wavBlob;
         } else {
           const result = await CloudSpeechSynthesizer.synthesize(text, synthesizeOptions);
@@ -222,7 +236,7 @@ export default function App() {
       setIsSpeaking(false);
       setDownloadError(e.message || "Failed to preview audio.");
     }
-  }, [text, isPaused, targetLang, pitch, rate, selectedBgm, bgmVolume, selectedProfile]);
+  }, [text, isPaused, getEffectiveLang, pitch, rate, selectedBgm, bgmVolume, selectedProfile]);
 
   // ─── PAUSE ───
   const handlePause = useCallback(() => {
@@ -239,15 +253,16 @@ export default function App() {
     setActiveChunkIndex(index);
     // NOTE: We do NOT set isGenerating here — chunk preview is non-blocking
     try {
+      const effectiveLang = getEffectiveLang(chunkText, selectedProfile);
       const synthesizeOptions = {
-        lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
+        lang: effectiveLang,
         pitch: pitch,
         rate: rate
       };
 
       let wavBlob;
       if (selectedProfile?.engine === 'edge-tts') {
-        const result = await EdgeTTSSynthesizer.synthesize(chunkText, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+        const result = await EdgeTTSSynthesizer.synthesize(chunkText, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: effectiveLang });
         wavBlob = result.wavBlob;
       } else {
         const result = await CloudSpeechSynthesizer.synthesize(chunkText, synthesizeOptions);
@@ -265,7 +280,7 @@ export default function App() {
     } catch (e) {
       setActiveChunkIndex(-1);
     }
-  }, [targetLang, pitch, rate, selectedBgm, bgmVolume]);
+  }, [getEffectiveLang, pitch, rate, selectedBgm, bgmVolume, selectedProfile]);
 
   // ─── PLAY SAMPLE (NON-BLOCKING) ───
   const handlePlaySample = useCallback(async (profile) => {
@@ -274,10 +289,9 @@ export default function App() {
     // NOTE: We do NOT set isGenerating here — sample playback is non-blocking
     const sample = profile.sampleText || 'AetherVocal Studio Speech Synthesis';
     try {
-      const rawLang = profile.lang || 'hi';
-      const cleanLang = rawLang.split('-')[0];
+      const effectiveLang = getEffectiveLang(sample, profile);
       const synthesizeOptions = { 
-        lang: cleanLang,
+        lang: effectiveLang,
         pitch: profile.defaultPitch || 1.0,
         rate: profile.defaultRate || 1.0,
         engine: profile.engine,
@@ -286,7 +300,7 @@ export default function App() {
 
       let wavBlob;
       if (profile.engine === 'edge-tts') {
-        const result = await EdgeTTSSynthesizer.synthesize(sample, { ...synthesizeOptions, voice: profile.edgeVoice, lang: profile.lang });
+        const result = await EdgeTTSSynthesizer.synthesize(sample, { ...synthesizeOptions, voice: profile.edgeVoice, lang: effectiveLang });
         wavBlob = result.wavBlob;
       } else {
         const result = await CloudSpeechSynthesizer.synthesize(sample, synthesizeOptions);
@@ -301,7 +315,7 @@ export default function App() {
       console.warn("Play sample error:", e);
       setIsPlayingSample(false);
     }
-  }, [stopAudio, playBlob]);
+  }, [stopAudio, playBlob, getEffectiveLang]);
 
   // ─── DOWNLOAD SINGLE CHUNK (WITH COMPRESSION & SCRIPT FILENAME) ───
   const handleDownloadSingleChunk = useCallback(async (chunkText, index) => {
@@ -309,15 +323,16 @@ export default function App() {
     setIsGenerating(true);
     setDownloadError('');
     try {
+      const effectiveLang = getEffectiveLang(chunkText, selectedProfile);
       const synthesizeOptions = {
-        lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(chunkText) ? 'hi' : 'en') : targetLang,
+        lang: effectiveLang,
         pitch: pitch,
         rate: rate,
       };
 
       let wavBlob;
       if (selectedProfile?.engine === 'edge-tts') {
-        const result = await EdgeTTSSynthesizer.synthesize(chunkText, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+        const result = await EdgeTTSSynthesizer.synthesize(chunkText, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: effectiveLang });
         wavBlob = result.wavBlob;
       } else {
         const result = await CloudSpeechSynthesizer.synthesize(chunkText, synthesizeOptions);
@@ -360,7 +375,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [targetLang, pitch, rate, isGenerating, selectedBgm, bgmVolume, selectedFormat, chunks.length, enableCompression]);
+  }, [getEffectiveLang, pitch, rate, isGenerating, selectedBgm, bgmVolume, selectedFormat, chunks.length, enableCompression, selectedProfile]);
 
   // ─── DOWNLOAD: BLOCK GENERATION (WITH AUTO-QUEUE & COMPRESSION) ───
   const handleGenerateBlock = useCallback(async () => {
@@ -407,8 +422,9 @@ export default function App() {
         ? Math.max(1, totalSelected - remainingPartsRef.current.length)
         : partNum;
 
+      const effectiveLang = getEffectiveLang(text, selectedProfile);
       const synthesizeOptions = {
-        lang: targetLang === 'all' ? (/[\u0900-\u097F]/.test(text) ? 'hi' : 'en') : targetLang,
+        lang: effectiveLang,
         pitch: pitch,
         rate: rate,
         startIndex: startIndex,
@@ -427,7 +443,7 @@ export default function App() {
 
       let wavBlob, endIndex, isComplete;
       if (selectedProfile?.engine === 'edge-tts') {
-        const result = await EdgeTTSSynthesizer.synthesize(text, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: selectedProfile.lang });
+        const result = await EdgeTTSSynthesizer.synthesize(text, { ...synthesizeOptions, voice: selectedProfile.edgeVoice, lang: effectiveLang });
         wavBlob = result.wavBlob;
         endIndex = result.endIndex;
         isComplete = result.isComplete;
@@ -717,6 +733,8 @@ export default function App() {
               onPlaySample={handlePlaySample}
               isPlayingSample={isPlayingSample}
               onStopSample={stopAudio}
+              manualLang={manualLang}
+              setManualLang={setManualLang}
             />
 
             <StudioMixer
