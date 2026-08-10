@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, Download, Loader2, X, AlertTriangle, Zap, XCircle, Layers, Sparkles } from 'lucide-react';
+import { Play, Pause, Square, Download, Loader2, X, AlertTriangle, Zap, XCircle, Sparkles } from 'lucide-react';
 
 export function FooterPlayer({
   isSpeaking,
@@ -83,6 +83,40 @@ export function FooterPlayer({
           </div>
         )}
 
+        {/* Batch Progress Bar (Top strip if active) */}
+        {autoQueueActive && isGenerating && (
+          <div className="batch-progress-container">
+            <div className="batch-progress-outer">
+              <div
+                className="batch-progress-parts-fill"
+                style={{ width: `${totalParts > 0 ? ((currentPartNumber - 1) / totalParts) * 100 : 0}%` }}
+              />
+              <div
+                className="batch-progress-chunk-fill"
+                style={{
+                  left: `${totalParts > 0 ? ((currentPartNumber - 1) / totalParts) * 100 : 0}%`,
+                  width: `${totalParts > 0 ? ((generationProgress?.percent || 0) / 100) * (100 / totalParts) : 0}%`
+                }}
+              />
+            </div>
+            <span className="batch-progress-text">
+              Part {currentPartNumber} of {totalParts}
+              {generationProgress?.total > 1 && (
+                <> • Chunk {generationProgress.current}/{generationProgress.total}</>  
+              )}
+            </span>
+          </div>
+        )}
+
+        {/* Compression Progress Banner */}
+        {isGenerating && generationProgress?.statusText && generationProgress.statusText.includes('Compressing') && (
+          <div className="compression-progress-banner">
+            <Zap className="w-4 h-4 text-emerald-400 animate-bounce flex-shrink-0" />
+            <span className="compression-progress-text">{generationProgress.statusText}</span>
+            <span className="compression-badge">Smart Compressor Active</span>
+          </div>
+        )}
+
         {/* Main Action Bar Row */}
         <div className="player-bar-main-row">
           {/* Left Settings Controls Group */}
@@ -158,40 +192,6 @@ export function FooterPlayer({
               </div>
             </div>
           </div>
-
-          {/* Batch Progress Bar */}
-          {autoQueueActive && isGenerating && (
-            <div className="batch-progress-container">
-              <div className="batch-progress-outer">
-                <div
-                  className="batch-progress-parts-fill"
-                  style={{ width: `${totalParts > 0 ? ((currentPartNumber - 1) / totalParts) * 100 : 0}%` }}
-                />
-                <div
-                  className="batch-progress-chunk-fill"
-                  style={{
-                    left: `${totalParts > 0 ? ((currentPartNumber - 1) / totalParts) * 100 : 0}%`,
-                    width: `${totalParts > 0 ? ((generationProgress?.percent || 0) / 100) * (100 / totalParts) : 0}%`
-                  }}
-                />
-              </div>
-              <span className="batch-progress-text">
-                Part {currentPartNumber} of {totalParts}
-                {generationProgress?.total > 1 && (
-                  <> • Chunk {generationProgress.current}/{generationProgress.total}</>  
-                )}
-              </span>
-            </div>
-          )}
-
-          {/* Compression Progress Banner */}
-          {isGenerating && generationProgress?.statusText && generationProgress.statusText.includes('Compressing') && (
-            <div className="compression-progress-banner">
-              <Zap className="w-4 h-4 text-emerald-400 animate-bounce flex-shrink-0" />
-              <span className="compression-progress-text">{generationProgress.statusText}</span>
-              <span className="compression-badge">Smart Compressor Active</span>
-            </div>
-          )}
 
           {/* Player Controls Right Group */}
           <div className="player-primary-actions">
