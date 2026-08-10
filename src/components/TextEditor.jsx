@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Sparkles, Check, Copy, Trash2, Zap, BookOpen, Briefcase, Video, UploadCloud, Languages, Clock, RefreshCw, ArrowRight, PauseCircle, Gauge, SpellCheck, Search } from 'lucide-react';
+import { FileText, Sparkles, Check, Copy, Trash2, Zap, BookOpen, Briefcase, Video, UploadCloud, Languages, Clock, RefreshCw, ArrowRight, PauseCircle, Gauge, SpellCheck, Search, Settings2, X } from 'lucide-react';
 import { FileUploader } from './FileUploader';
 import { stripTimestamps, countTimestamps, sanitizeScript } from '../utils/textSanitizer';
 import { translateScript, SUPPORTED_LANGUAGES } from '../utils/translator';
@@ -40,11 +40,40 @@ export function TextEditor({
   stats,
   chunkCount,
   onSanitize,
-  onGenerateAudio
+  onGenerateAudio,
+  setRate,
+  setPitch
 }) {
   const [activeTab, setActiveTab] = useState('editor'); // 'editor' | 'upload' | 'translate' | 'preview'
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef(null);
+  
+  const [isEditingDuration, setIsEditingDuration] = useState(false);
+
+  const [targetHr, setTargetHr] = useState('');
+  const [targetMin, setTargetMin] = useState('');
+  const [targetSec, setTargetSec] = useState('');
+
+  const handleTargetDurationChange = (hr, min, sec) => {
+    const totalSecs = (parseInt(hr || 0) * 3600) + (parseInt(min || 0) * 60) + parseInt(sec || 0);
+    if (totalSecs > 0 && stats.charCount > 0 && setRate) {
+      const baseDuration = stats.charCount / 12;
+      let newRate = baseDuration / totalSecs;
+      newRate = Math.max(0.1, Math.min(newRate, 50.0));
+      setRate(parseFloat(newRate.toFixed(2)));
+
+      // Keep pitch in a natural human-like range (tightly clamped between 0.95 and 1.05)
+      if (setPitch) {
+        let humanPitch = 1.0;
+        if (newRate > 1.0) {
+          humanPitch = Math.min(1.05, 1.0 + (Math.log10(newRate) * 0.03));
+        } else if (newRate < 1.0) {
+          humanPitch = Math.max(0.95, 1.0 - (Math.abs(1 - newRate) * 0.04));
+        }
+        setPitch(parseFloat(humanPitch.toFixed(2)));
+      }
+    }
+  };
 
   // Translation State
   const [targetLangCode, setTargetLangCode] = useState('hi');
@@ -488,19 +517,76 @@ export function TextEditor({
 
       {/* Editor Footer & Stat Pills Row */}
       <div className="editor-footer">
-        <div className="stats-pills-row">
+        <div className="stats-pills-row items-center flex-wrap gap-y-2">
           <span className="stat-pill-badge">
             Chars: <strong className="text-cyan-400 ml-1">{stats.charCount}</strong>
           </span>
           <span className="stat-pill-badge">
             Words: <strong className="text-pink-400 ml-1">{stats.wordCount}</strong>
           </span>
-          <span className="stat-pill-badge">
-            Duration: <strong className="text-amber-400 ml-1">~{stats.formattedDuration}</strong>
-          </span>
           <span className="stat-pill-badge highlight-pill">
             Chunks: <strong className="text-emerald-400 ml-1">{chunkCount}</strong>
           </span>
+          
+          {isEditingDuration ? (
+            <span className="stat-pill-badge border border-amber-500/50 text-amber-300 px-1.5 transition-all" style={{ background: 'var(--input-bg)' }}>
+              <Clock className="w-3 h-3 text-amber-400 flex-shrink-0 mr-0.5" />
+              <div className="flex items-center gap-0.5 font-mono text-xs">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="00"
+                  value={targetHr}
+                  onChange={(e) => { setTargetHr(e.target.value); handleTargetDurationChange(e.target.value, targetMin, targetSec); }}
+                  style={{ width: '22px', background: 'transparent', border: 'none', outline: 'none', color: '#fbbf24', textAlign: 'center', padding: 0, fontWeight: 700 }}
+                />
+                <span className="text-amber-500/60 text-[10px] font-bold">:</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="00"
+                  value={targetMin}
+                  onChange={(e) => { setTargetMin(e.target.value); handleTargetDurationChange(targetHr, e.target.value, targetSec); }}
+                  style={{ width: '22px', background: 'transparent', border: 'none', outline: 'none', color: '#fbbf24', textAlign: 'center', padding: 0, fontWeight: 700 }}
+                />
+                <span className="text-amber-500/60 text-[10px] font-bold">:</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="00"
+                  value={targetSec}
+                  onChange={(e) => { setTargetSec(e.target.value); handleTargetDurationChange(targetHr, targetMin, e.target.value); }}
+                  style={{ width: '22px', background: 'transparent', border: 'none', outline: 'none', color: '#fbbf24', textAlign: 'center', padding: 0, fontWeight: 700 }}
+                />
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsEditingDuration(false)} 
+                style={{ background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '4px', color: '#34d399', padding: '1px 4px', marginLeft: '3px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Done"
+              >
+                <Check className="w-3 h-3" />
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setIsEditingDuration(false)} 
+                style={{ background: 'rgba(244, 63, 94, 0.15)', border: '1px solid rgba(244, 63, 94, 0.3)', borderRadius: '4px', color: '#fb7185', padding: '1px 4px', marginLeft: '2px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Cancel"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ) : (
+            <span 
+              className="stat-pill-badge group relative cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/50 transition-all border border-amber-500/20 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.1)] px-2.5 py-1" 
+              onClick={() => setIsEditingDuration(true)}
+              title="Click to set target duration"
+            >
+              <Clock className="w-3 h-3 text-amber-400 mr-1" />
+              Duration: <strong className="text-amber-400 ml-1 font-mono">~{stats.formattedDuration}</strong>
+              <Settings2 className="w-3 h-3 text-amber-400/60 group-hover:text-amber-300 group-hover:rotate-45 ml-1.5 transition-all" />
+            </span>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-2 w-full sm:w-auto flex-wrap">

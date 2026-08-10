@@ -671,6 +671,8 @@ export default function App() {
               chunkCount={chunks.length}
               onSanitize={handleSanitizeText}
               onGenerateAudio={handleGenerateBlock}
+              setRate={setRate}
+              setPitch={setPitch}
             />
 
             <SpeechPartQueue
@@ -711,6 +713,7 @@ export default function App() {
               setRate={setRate}
               pitch={pitch}
               setPitch={setPitch}
+              charCount={charCount}
               onPlaySample={handlePlaySample}
               isPlayingSample={isPlayingSample}
               onStopSample={stopAudio}

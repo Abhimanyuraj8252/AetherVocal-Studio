@@ -14,6 +14,7 @@ export function VoiceSelector({
   setRate,
   pitch,
   setPitch,
+  charCount,
   onPlaySample,
   isPlayingSample,
   onStopSample
@@ -34,6 +35,7 @@ export function VoiceSelector({
     const matchesGender = targetGender === 'all' || profile.gender.toLowerCase() === targetGender;
     return matchesLang && matchesGender;
   });
+
 
   // Auto-select first profile if current selection doesn't match
   useEffect(() => {
@@ -285,49 +287,94 @@ export function VoiceSelector({
         })}
       </div>
 
-      {/* Speed (Rate) & Pitch Sliders */}
-      <div className="sliders-grid">
-        {/* Speaking Speed Slider (Default 1.0x) */}
-        <div className="slider-card">
-          <div className="slider-header">
-            <span className="slider-label">Speaking Speed (गति)</span>
-            <span className="slider-value">{rate.toFixed(1)}x</span>
-          </div>
-          <input
-            type="range"
-            min="0.5"
-            max="1.8"
-            step="0.1"
-            value={rate}
-            onChange={(e) => setRate(parseFloat(e.target.value))}
-            className="custom-range range-cyan"
-          />
-          <div className="range-marks">
-            <span>0.5x</span>
-            <span className="font-bold text-cyan-400">1.0x (Normal)</span>
-            <span>1.8x</span>
-          </div>
-        </div>
+      {/* Speed, Pitch, & Duration Controls Area */}
+      <div className="flex flex-col gap-3">
 
-        {/* Voice Pitch Slider */}
-        <div className="slider-card">
-          <div className="slider-header">
-            <span className="slider-label">Voice Pitch (पिच)</span>
-            <span className="slider-value">{pitch.toFixed(2)}</span>
+        {/* Speed & Pitch Grid */}
+        <div className="sliders-grid">
+          {/* Speaking Speed Control */}
+          <div className="slider-card">
+            <div className="slider-header flex-wrap gap-2">
+              <span className="slider-label">Speaking Speed (गति)</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--border-highlight)', borderRadius: '6px', padding: '0.1rem 0.4rem', gap: '0.1rem' }}>
+                <input 
+                  type="number"
+                  step="0.01"
+                  min="0.1"
+                  max="50"
+                  value={rate}
+                  onChange={(e) => {
+                    let val = parseFloat(e.target.value);
+                    setRate(e.target.value);
+                    if (!isNaN(val) && val >= 0.1 && val <= 50) setRate(val);
+                  }}
+                  onBlur={(e) => {
+                    let val = parseFloat(e.target.value);
+                    if (isNaN(val) || val < 0.1) setRate(0.1);
+                    else if (val > 50) setRate(50);
+                    else setRate(parseFloat(val.toFixed(2)));
+                  }}
+                  style={{ width: '38px', background: 'transparent', border: 'none', outline: 'none', color: 'var(--cyan-accent)', fontWeight: 700, fontSize: '0.75rem', fontFamily: 'monospace', textAlign: 'right', padding: 0 }}
+                />
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--cyan-accent)', userSelect: 'none' }}>x</span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="50"
+              step="0.01"
+              value={rate || 1.0}
+              onChange={(e) => setRate(parseFloat(e.target.value))}
+              className="custom-range range-cyan mt-3"
+            />
+            <div className="range-marks mt-1.5">
+              <span>0.1x</span>
+              <span className="font-bold text-cyan-400">1.0x</span>
+              <span>50x</span>
+            </div>
           </div>
-          <input
-            type="range"
-            min="0.5"
-            max="1.5"
-            step="0.05"
-            value={pitch}
-            onChange={(e) => setPitch(parseFloat(e.target.value))}
-            className="custom-range range-purple"
-          />
-          <div className="range-marks">
-            <span>0.70 (Deep)</span>
-            <span>1.0 (Default)</span>
-            <span>1.30 (High)</span>
+
+          {/* Voice Pitch Control */}
+          <div className="slider-card">
+            <div className="slider-header flex-wrap gap-2">
+              <span className="slider-label">Voice Pitch (पिच)</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--input-bg)', border: '1px solid var(--border-highlight)', borderRadius: '6px', padding: '0.1rem 0.4rem', gap: '0.15rem' }}>
+                <input 
+                  type="number"
+                  step="0.01"
+                  min="0.5"
+                  max="2.0"
+                  value={pitch}
+                  onChange={(e) => {
+                    let val = parseFloat(e.target.value);
+                    setPitch(e.target.value);
+                    if (!isNaN(val) && val >= 0.5 && val <= 2.0) setPitch(val);
+                  }}
+                  onBlur={(e) => {
+                    let val = parseFloat(e.target.value);
+                    if (isNaN(val) || val < 0.5) setPitch(0.5);
+                    else if (val > 2.0) setPitch(2.0);
+                    else setPitch(parseFloat(val.toFixed(2)));
+                  }}
+                  style={{ width: '38px', background: 'transparent', border: 'none', outline: 'none', color: '#c084fc', fontWeight: 700, fontSize: '0.75rem', fontFamily: 'monospace', textAlign: 'center', padding: 0 }}
+                />
+              </div>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="2.0"
+              step="0.05"
+              value={pitch || 1.0}
+              onChange={(e) => setPitch(parseFloat(e.target.value))}
+              className="custom-range range-purple mt-3"
+            />
+            <div className="range-marks mt-1.5">
+              <span>0.5 (Low)</span>
+              <span>1.0 (Def)</span>
+              <span>2.0 (High)</span>
+            </div>
           </div>
         </div>
       </div>
