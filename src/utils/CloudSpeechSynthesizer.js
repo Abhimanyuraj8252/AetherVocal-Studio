@@ -360,27 +360,55 @@ export class CloudSpeechSynthesizer {
         }
 
         const cleanLang = (lang || 'hi').split('-')[0];
-        const primaryUrl = `https://lingva.ml/api/v1/audio/${cleanLang}/${encodeURIComponent(cleanChunk)}`;
-        const response = await fetch(primaryUrl);
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.audio && Array.isArray(data.audio)) {
-            const uint8Array = new Uint8Array(data.audio);
-            const arrayBuffer = uint8Array.buffer;
-            return await audioCtx.decodeAudioData(arrayBuffer);
+        // 1. Try local/Vercel serverless Edge TTS first (highest quality & reliable)
+        try {
+          const edgeVoice = cleanLang === 'hi' ? 'hi-IN-SwaraNeural' : 'en-US-AriaNeural';
+          const edgeRes = await fetch('/api/edge-tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: cleanChunk, voice: edgeVoice, lang: cleanLang === 'hi' ? 'hi-IN' : 'en-US' })
+          });
+          if (edgeRes.ok) {
+            const ab = await edgeRes.arrayBuffer();
+            if (ab && ab.byteLength > 0) {
+              return await audioCtx.decodeAudioData(ab);
+            }
+          }
+        } catch (edgeErr) {
+          // Continue to fallback endpoints
+        }
+
+        // 2. Try working Lingva instances & Google TTS fallback
+        const candidateUrls = [
+          `https://lingva.ml/api/v1/audio/${cleanLang}/${encodeURIComponent(cleanChunk)}`,
+          `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&q=${encodeURIComponent(cleanChunk)}&tl=${cleanLang}`
+        ];
+
+        for (const url of candidateUrls) {
+          try {
+            const resp = await fetch(url);
+            if (!resp.ok) continue;
+
+            const cType = resp.headers.get('content-type') || '';
+            if (cType.includes('application/json')) {
+              const data = await resp.json();
+              if (data && data.audio && Array.isArray(data.audio)) {
+                const uint8Array = new Uint8Array(data.audio);
+                return await audioCtx.decodeAudioData(uint8Array.buffer);
+              }
+            } else {
+              const arrayBuffer = await resp.arrayBuffer();
+              if (arrayBuffer && arrayBuffer.byteLength > 0) {
+                return await audioCtx.decodeAudioData(arrayBuffer);
+              }
+            }
+          } catch (e) {
+            // Next candidate
           }
         }
 
-        // Fallback: direct Google Translate TTS endpoint
-        const fallbackUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&q=${encodeURIComponent(cleanChunk)}&tl=${cleanLang}`;
-        const res = await fetch(fallbackUrl);
-        if (res.ok) {
-          const arrayBuffer = await res.arrayBuffer();
-          return await audioCtx.decodeAudioData(arrayBuffer);
-        }
-
-        throw new Error(`Both APIs failed. Lingva: ${response.status}, Google: ${res.status}`);
+        throw new Error('All speech synthesis endpoints failed. Please check network connection.');
       } catch (err) {
         lastErr = err;
         console.warn(`Chunk fetch attempt ${attempt + 1} failed, retrying...`, err);

@@ -1,4 +1,5 @@
 import { CloudSpeechSynthesizer } from './CloudSpeechSynthesizer';
+import { generateSecMsGecV2, SEC_MS_GEC_VERSION } from './edgeDrm';
 
 /**
  * A browser-side Text-to-Speech synthesizer using the Microsoft Edge TTS WebSocket API.
@@ -143,9 +144,8 @@ export default class EdgeTTSSynthesizer {
     }
 
     // 2. Fallback to local Vite WebSocket proxy for dev environment
-    const secGec = await this.generateSecMsGec();
-    // Use latest stable Edge/Chromium version — keep in sync with api/edge-tts.js
-    const secGecVer = '1-130.0.2849.68';
+    const secGec = generateSecMsGecV2();
+    const secGecVer = SEC_MS_GEC_VERSION;
 
     return new Promise((resolve, reject) => {
       const connectionId = this.generateUUID();

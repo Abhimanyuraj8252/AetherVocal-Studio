@@ -1,17 +1,6 @@
 import crypto from 'crypto';
 import WebSocket from 'ws';
-
-// Generates Sec-MS-GEC authentication token required by Microsoft Edge Speech service
-async function generateSecMsGec() {
-  const WIN_EPOCH = 11644473600;
-  const S_TO_NS = 1e9;
-  let ticks = Date.now() / 1000;
-  ticks += WIN_EPOCH;
-  ticks -= ticks % 300;
-  ticks *= S_TO_NS / 100;
-  const strToHash = `${Math.floor(ticks)}6A5AA1D4EAFF4E9FB37E23D68491D6F4`;
-  return crypto.createHash('sha256').update(strToHash).digest('hex').toUpperCase();
-}
+import { generateSecMsGecV2, SEC_MS_GEC_VERSION, EDGE_USER_AGENT } from '../src/utils/edgeDrm.js';
 
 function generateUUID() {
   return crypto.randomUUID().replace(/-/g, '');
@@ -42,9 +31,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing or invalid "text" parameter.' });
     }
 
-    const secGec = await generateSecMsGec();
-    // Use latest stable Edge/Chromium version — update this if 403 errors recur
-    const secGecVer = '1-130.0.2849.68';
+    // Generate V2 Sec-MS-GEC DRM Token required by Microsoft Edge speech synthesis
+    const secGec = generateSecMsGecV2();
+    const secGecVer = SEC_MS_GEC_VERSION;
     const connectionId = generateUUID();
 
     const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=${connectionId}&Sec-MS-GEC=${secGec}&Sec-MS-GEC-Version=${secGecVer}`;
@@ -53,9 +42,12 @@ export default async function handler(req, res) {
       const ws = new WebSocket(wsUrl, {
         headers: {
           'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+          'User-Agent': EDGE_USER_AGENT,
           'Pragma': 'no-cache',
           'Cache-Control': 'no-cache',
+          'Sec-WebSocket-Version': '13',
+          'Accept-Encoding': 'gzip, deflate, br, zstd',
+          'Accept-Language': 'en-US,en;q=0.9',
         }
       });
 

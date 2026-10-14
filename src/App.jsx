@@ -202,6 +202,7 @@ export default function App() {
       
       let wavBlob = null;
 
+      let lastSynthesisError = null;
       // 1. Try Primary Synthesizer Engine (Edge TTS or Cloud Synthesizer)
       try {
         if (selectedProfile?.engine === 'edge-tts') {
@@ -212,16 +213,20 @@ export default function App() {
           wavBlob = result?.wavBlob;
         }
       } catch (primaryErr) {
+        lastSynthesisError = primaryErr;
         console.warn("Primary TTS engine failed, trying fallback Cloud Synthesizer:", primaryErr);
         try {
           const result = await CloudSpeechSynthesizer.synthesize(text, synthesizeOptions);
           wavBlob = result?.wavBlob;
         } catch (fallbackErr) {
+          lastSynthesisError = fallbackErr;
           console.error("All TTS engines failed:", fallbackErr);
         }
       }
 
-      if (!wavBlob) throw new Error('Audio synthesis failed. Please check network connection.');
+      if (!wavBlob) {
+        throw new Error(lastSynthesisError?.message || 'Audio synthesis failed. Please check network connection.');
+      }
 
       // Mix BGM Soundscape if enabled
       if (selectedBgm !== 'none') {
