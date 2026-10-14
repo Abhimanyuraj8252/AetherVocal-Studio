@@ -144,7 +144,8 @@ export default class EdgeTTSSynthesizer {
 
     // 2. Fallback to local Vite WebSocket proxy for dev environment
     const secGec = await this.generateSecMsGec();
-    const secGecVer = '1-143.0.3644.0';
+    // Use latest stable Edge/Chromium version — keep in sync with api/edge-tts.js
+    const secGecVer = '1-130.0.2849.68';
 
     return new Promise((resolve, reject) => {
       const connectionId = this.generateUUID();
@@ -155,9 +156,18 @@ export default class EdgeTTSSynthesizer {
       const ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
 
+      // Guard flag to prevent double-resolve/reject after Promise settles
+      let settled = false;
+      const settle = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        fn(value);
+      };
+
       const timeoutId = setTimeout(() => {
         ws.close();
-        reject(new Error('WebSocket connection timed out after 30 seconds.'));
+        settle(reject, new Error('WebSocket connection timed out after 30 seconds.'));
       }, 30000);
 
       const audioDataChunks = [];
@@ -206,7 +216,6 @@ export default class EdgeTTSSynthesizer {
           }
         } else if (typeof event.data === 'string') {
           if (event.data.includes('Path:turn.end')) {
-            clearTimeout(timeoutId);
             ws.close();
 
             try {
@@ -221,23 +230,35 @@ export default class EdgeTTSSynthesizer {
               const audioContext = new (window.AudioContext || window.webkitAudioContext)();
               const audioBuffer = await audioContext.decodeAudioData(combinedArray.buffer);
               try { if (audioContext.state !== 'closed') audioContext.close(); } catch(e) {}
-              resolve(audioBuffer);
+              settle(resolve, audioBuffer);
             } catch (err) {
-              reject(new Error('Failed to decode audio data: ' + err.message));
+              settle(reject, new Error('Failed to decode audio data: ' + err.message));
             }
           }
         }
       };
 
-      ws.onerror = (error) => {
-        clearTimeout(timeoutId);
-        reject(new Error('WebSocket error occurred'));
+      ws.onerror = (event) => {
+        // Browser WebSocket error events don't expose message directly; log for debugging
+        const msg = event.message || (event.error && event.error.message) || 'WebSocket connection error';
+        settle(reject, new Error(msg));
       };
       
       ws.onclose = (event) => {
-        clearTimeout(timeoutId);
-        if (audioDataChunks.length === 0 && event.code !== 1000) {
-          reject(new Error(`WebSocket closed prematurely (code: ${event.code})`));
+        if (!settled) {
+          if (audioDataChunks.length > 0) {
+            // Audio already buffered but turn.end wasn't received cleanly — try to decode
+            const totalLength = audioDataChunks.reduce((acc, val) => acc + val.length, 0);
+            const combinedArray = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of audioDataChunks) { combinedArray.set(chunk, offset); offset += chunk.length; }
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            audioContext.decodeAudioData(combinedArray.buffer)
+              .then(ab => { try { audioContext.close(); } catch(e) {} settle(resolve, ab); })
+              .catch(e => settle(reject, new Error('Failed to decode audio on close: ' + e.message)));
+          } else {
+            settle(reject, new Error(`WebSocket closed prematurely (code: ${event.code}, reason: ${event.reason || 'none'})`));
+          }
         }
       };
     });

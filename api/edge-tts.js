@@ -43,7 +43,8 @@ export default async function handler(req, res) {
     }
 
     const secGec = await generateSecMsGec();
-    const secGecVer = '1-143.0.3644.0';
+    // Use latest stable Edge/Chromium version — update this if 403 errors recur
+    const secGecVer = '1-130.0.2849.68';
     const connectionId = generateUUID();
 
     const wsUrl = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=${connectionId}&Sec-MS-GEC=${secGec}&Sec-MS-GEC-Version=${secGecVer}`;
@@ -52,18 +53,25 @@ export default async function handler(req, res) {
       const ws = new WebSocket(wsUrl, {
         headers: {
           'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
           'Pragma': 'no-cache',
           'Cache-Control': 'no-cache',
-          'Cookie': 'muid=A1B2C3D4E5F67890123456789ABCDEF0;'
         }
       });
 
       const audioChunks = [];
+      // Guard flag to prevent double-resolve/reject after Promise settles
+      let settled = false;
+      const settle = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        fn(value);
+      };
 
       const timeoutId = setTimeout(() => {
         try { ws.close(); } catch (e) {}
-        reject(new Error('TTS WebSocket request timed out (25 seconds).'));
+        settle(reject, new Error('TTS WebSocket request timed out (25 seconds).'));
       }, 25000);
 
       ws.on('open', () => {
@@ -120,25 +128,23 @@ export default async function handler(req, res) {
         } else {
           const msgText = data.toString();
           if (msgText.includes('Path:turn.end')) {
-            clearTimeout(timeoutId);
             try { ws.close(); } catch (e) {}
-            const fullBuffer = Buffer.concat(audioChunks);
-            resolve(fullBuffer);
+            settle(resolve, Buffer.concat(audioChunks));
           }
         }
       });
 
       ws.on('error', (err) => {
-        clearTimeout(timeoutId);
-        reject(err);
+        settle(reject, new Error(`WebSocket error: ${err.message || String(err)}`));
       });
 
-      ws.on('close', (code) => {
-        clearTimeout(timeoutId);
-        if (audioChunks.length === 0 && code !== 1000) {
-          reject(new Error(`WebSocket closed unexpectedly (code: ${code}).`));
-        } else if (audioChunks.length > 0) {
-          resolve(Buffer.concat(audioChunks));
+      ws.on('close', (code, reason) => {
+        if (!settled) {
+          if (audioChunks.length > 0) {
+            settle(resolve, Buffer.concat(audioChunks));
+          } else {
+            settle(reject, new Error(`WebSocket closed unexpectedly (code: ${code}, reason: ${reason || 'none'}).`));
+          }
         }
       });
     });
